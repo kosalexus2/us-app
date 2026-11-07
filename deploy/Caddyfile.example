@@ -1,0 +1,5 @@
+# Use this if there is NO web server yet on ports 80/443 (Caddy gets the HTTPS certificate by itself).
+usapp.kosalexus.by {
+    encode gzip
+    reverse_proxy 127.0.0.1:3100
+}

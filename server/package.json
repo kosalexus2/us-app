@@ -1,0 +1,17 @@
+{
+  "name": "us-app-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "set-webhook": "node src/setup-bot.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.0.0",
+    "better-sqlite3": "^11.5.0",
+    "fastify": "^5.1.0"
+  }
+}

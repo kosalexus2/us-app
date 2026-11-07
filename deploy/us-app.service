@@ -1,0 +1,22 @@
+[Unit]
+Description=Us App (Telegram Mini App backend + static frontend)
+After=network.target
+
+[Service]
+Type=simple
+User=usapp
+Group=usapp
+WorkingDirectory=/opt/us-app/server
+EnvironmentFile=/opt/us-app/server/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=3
+# the server is small; cap memory so it can never starve the CRM on the same 1 GB VPS
+MemoryMax=300M
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/us-app/server/data
+
+[Install]
+WantedBy=multi-user.target
