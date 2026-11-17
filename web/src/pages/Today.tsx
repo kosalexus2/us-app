@@ -37,7 +37,7 @@ export default function TodayPage() {
     reload();
   };
   const q = data.question;
-  const inviteUrl = boot.bot_username && boot.couple ? `https://t.me/${boot.bot_username}?startapp=invite_${boot.couple.invite_code}` : '';
+  const inviteUrl = boot.bot_username && boot.couple ? `https://t.me/${boot.bot_username}/app?startapp=invite_${boot.couple.invite_code}` : '';
 
   return (
     <div className="scroll">
