@@ -55,6 +55,22 @@ export function registerFriends(api, { botToken, webAppUrl }) {
     return { ok: true, friend: pub(owner) };
   });
 
+  // Кто приглашает: для экрана «Вас приглашают». Код вида friend_<код> или invite_<код>.
+  api.get('/api/invite/:code', async (req, reply) => {
+    const param = String(req.params.code || '').slice(0, 60);
+    if (param.startsWith('friend_')) {
+      const owner = db.prepare('SELECT * FROM users WHERE friend_code = ?').get(param.slice(7));
+      if (!owner) return reply.code(404).send({ error: 'invalid_code' });
+      return { kind: 'friend', from: pub(owner), full: false, self: owner.id === req.tgUser.id };
+    }
+    const couple = db.prepare('SELECT * FROM couples WHERE invite_code = ?').get(param.replace(/^invite_/, ''));
+    const owner = couple ? db.prepare('SELECT * FROM users WHERE couple_id = ? ORDER BY id LIMIT 1').get(couple.id) : null;
+    if (!owner) return reply.code(404).send({ error: 'invalid_code' });
+    const n = db.prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').get(couple.id).n;
+    const mine = req.tgUser.couple_id === couple.id;
+    return { kind: 'partner', from: pub(owner), full: n >= 2 && !mine, self: mine };
+  });
+
   api.delete('/api/friends/:id', async (req) => {
     const me = req.tgUser;
     const id = Number(req.params.id);
