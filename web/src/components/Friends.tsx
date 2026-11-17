@@ -1,39 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Trash2, UserPlus, Users } from 'lucide-react';
-import { del, post, useResource } from '../api';
+import { del, useResource } from '../api';
 import { useApp } from '../ctx';
 import { Avatar, Sheet, useToast } from './ui';
 import type { User } from './ui';
-import { haptic, shareInvite, startParam } from '../tg';
+import { haptic, shareInvite } from '../tg';
 
 type Friend = User & { username: string | null };
 type FriendsData = { code: string; friends: Friend[] };
 
-// Открыли по ссылке t.me/<bot>/app?startapp=friend_<код>: добавляем в друзья один раз при запуске.
-const joinParam = (() => {
-  const p = startParam() || '';
-  return p.startsWith('friend_') ? p : null;
-})();
-let joinPromise: Promise<any> | null = joinParam
-  ? post('/friends/join', { code: joinParam }).catch((e: any) => ({ error: e?.message || 'error' }))
-  : null;
-
 export function FriendsButton() {
   const { boot } = useApp();
   const [open, setOpen] = useState(false);
-  const toast = useToast();
-
-  useEffect(() => {
-    const p = joinPromise;
-    if (!p) return;
-    joinPromise = null;
-    p.then((r) => {
-      if (r?.friend) toast(`${r.friend.first_name} теперь у вас в друзьях`);
-      else if (r?.error === 'invalid_code') toast('Приглашение недействительно');
-      else if (r?.error === 'self') toast('Это ваша собственная ссылка');
-    });
-  }, [toast]);
 
   return (
     <>
