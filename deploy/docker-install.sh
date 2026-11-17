@@ -63,6 +63,9 @@ docker run -d --name us-app --restart unless-stopped --network "$NET" --memory 3
   -v "$APP/data:/data" us-app >/dev/null
 sleep 4
 docker exec us-app node -e "fetch('http://127.0.0.1:3100/api/health').then(r=>r.text()).then(t=>console.log('health:',t))"
+echo "== 5b. Автообновление (проверка GitHub раз в минуту) =="
+(crontab -l 2>/dev/null | grep -v us-app-auto || true; echo "* * * * * flock -n /tmp/usapp-upd.lock bash $APP/deploy/auto-update.sh >> /var/log/us-app-update.log 2>&1 # us-app-auto") | crontab -
+echo "Готово: новые коммиты в GitHub сами попадут на сервер в течение 1-3 минут"
 
 echo "== 6. Caddy: добавляю сайт $DOMAIN =="
 if grep -q "$DOMAIN" "$CF"; then
