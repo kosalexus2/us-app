@@ -28,7 +28,7 @@ export default function Onboarding({ invite, botUsername, onDone, existingCode }
   }
 
   if (code) {
-    const link = botUsername ? `https://t.me/${botUsername}?startapp=invite_${code}` : '';
+    const link = botUsername ? `https://t.me/${botUsername}/app?startapp=invite_${code}` : '';
     return (
       <div className="center-screen">
         <div className="logo-ring"><Link2 size={40} /></div>
