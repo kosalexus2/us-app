@@ -4,6 +4,7 @@ import { useResource } from './api';
 import { Ctx, Tab } from './ctx';
 import { Avatar, Skeletons, ToastProvider } from './components/ui';
 import { FriendsButton } from './components/Friends';
+import InviteScreen from './pages/Invite';
 import QuickAdd from './components/QuickAdd';
 import Onboarding from './pages/Onboarding';
 import TodayPage from './pages/Today';
@@ -34,6 +35,7 @@ function Shell() {
   const [quick, setQuick] = useState(false);
   const [eventSheet, setEventSheet] = useState(false);
   const [solo, setSolo] = useState(false);
+  const [inviteDone, setInviteDone] = useState(false);
 
   const go = useCallback((tab: Tab, sub?: string) => {
     haptic.tap();
@@ -56,7 +58,15 @@ function Shell() {
   }
   if (!boot || !ctx) return <div className="app"><div className="scroll" style={{ paddingTop: 80 }}><Skeletons n={3} /></div></div>;
 
-  const invite = (boot.start_param || startParam() || '').startsWith('invite_') ? (boot.start_param || startParam()) : null;
+  // Пришли по ссылке-приглашению: сначала экран «Вас приглашают», потом всё остальное.
+  const param = boot.start_param || startParam() || '';
+  const partnerCode = param.startsWith('invite_') ? param.slice(7) : null;
+  const friendInvite = param.startsWith('friend_');
+  const partnerPending = !!partnerCode && !(boot.couple && boot.partner) && boot.couple?.invite_code !== partnerCode;
+  if (!inviteDone && (partnerPending || friendInvite)) {
+    return <InviteScreen param={param} onDone={() => { setInviteDone(true); reload(); }} />;
+  }
+  const invite: string | null = null;
   if (!boot.couple) {
     return <Onboarding invite={invite} botUsername={boot.bot_username} onDone={reload} />;
   }
