@@ -3,6 +3,7 @@ import { BookHeart, CalendarDays, Heart, House, Plus } from 'lucide-react';
 import { useResource } from './api';
 import { Ctx, Tab } from './ctx';
 import { Avatar, Skeletons, ToastProvider } from './components/ui';
+import { FriendsButton } from './components/Friends';
 import QuickAdd from './components/QuickAdd';
 import Onboarding from './pages/Onboarding';
 import TodayPage from './pages/Today';
@@ -78,6 +79,7 @@ function Shell() {
         <header className="topbar">
           <span className="brand">Us App</span>
           <div className="avatars">
+            <FriendsButton />
             <Avatar user={boot.me} dot />
             {boot.partner && <Avatar user={boot.partner} dot />}
           </div>
