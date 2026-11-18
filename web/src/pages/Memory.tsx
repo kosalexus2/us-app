@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Camera, Clapperboard, Gift, Lock, Mail, Plus, Sparkles, Trash2 } from 'lucide-react';
-import { del, post, useResource } from '../api';
+import { Camera, Clapperboard, Gift, Lock, Mail, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { del, patch, post, useResource } from '../api';
+import { EditSheet, RowActions } from '../components/Editable';
 import { useApp } from '../ctx';
 import { Empty, Segmented, Sheet, Skeletons, Switch } from '../components/ui';
 import type { Note, Wish } from '../types';
@@ -36,6 +37,7 @@ function Wishlist() {
   const [who, setWho] = useState<'me' | 'partner'>('me');
   const [kind, setKind] = useState<Wish['kind']>('gift');
   const [adding, setAdding] = useState(false);
+  const [edit, setEdit] = useState<Wish | null>(null);
   if (!data) return <Skeletons n={2} />;
   const list = data.filter((w) => (who === 'me' ? w.mine : !w.mine) && w.kind === kind);
 
@@ -67,7 +69,7 @@ function Wishlist() {
               <h3>{w.title}</h3>
               <div className="price">{w.price ? `${w.price}` : ' '}</div>
               {w.mine ? (
-                <button className="btn ghost sm" onClick={async () => { await del(`/wishes/${w.id}`); reload(); }}><Trash2 size={14} /> Удалить</button>
+                <button className="btn soft sm" onClick={() => setEdit(w)}><Pencil size={14} /> Изменить</button>
               ) : w.kind === 'gift' ? (
                 <button className={`btn sm ${w.claimed_by_me ? 'soft' : 'primary'}`} onClick={() => claim(w)}>{w.claimed_by_me ? 'Ты берёшь ✓' : 'Беру на себя'}</button>
               ) : null}
@@ -84,6 +86,22 @@ function Wishlist() {
       )}
       {who === 'me' && list.length > 0 && <button className="btn soft block" style={{ marginTop: 16 }} onClick={() => setAdding(true)}><Plus size={18} /> Добавить</button>}
       {adding && <AddWishSheet initial={kind} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); reload(); }} />}
+      {edit && (
+        <EditSheet
+          title="Желание"
+          value={{ title: edit.title, kind: edit.kind, price: edit.price || '', url: edit.url || '', image_url: edit.image_url || '' }}
+          fields={[
+            { k: 'title', label: 'Что это' },
+            { k: 'kind', label: 'Раздел', type: 'chips', options: (Object.keys(KIND_LABEL) as Wish['kind'][]).map((k) => [k, KIND_LABEL[k]]) },
+            { k: 'price', label: 'Цена' },
+            { k: 'url', label: 'Ссылка', type: 'url' },
+            { k: 'image_url', label: 'Картинка (ссылка)', type: 'url' },
+          ]}
+          onClose={() => setEdit(null)}
+          onSave={async (p) => { await patch(`/wishes/${edit.id}`, p); reload(); }}
+          onDelete={async () => { await del(`/wishes/${edit.id}`); reload(); }}
+        />
+      )}
     </>
   );
 }
@@ -118,6 +136,7 @@ export function AddWishSheet({ initial = 'gift', title: t0 = '', onClose, onSave
 function Notes() {
   const { data, reload } = useResource<Note[]>('/notes', 6000);
   const [adding, setAdding] = useState(false);
+  const [edit, setEdit] = useState<Note | null>(null);
   if (!data) return <Skeletons n={2} />;
   return (
     <>
@@ -131,7 +150,7 @@ function Notes() {
                 <span style={{ color: 'var(--label-2)', fontWeight: 500 }}>{n.open_at && n.open_at > Date.now() / 1000 ? `откроется ${fmtDateTime(n.open_at)}` : fmtDateTime(n.created_at)}</span>
               </div>
               {n.locked ? <p style={{ color: 'var(--label-2)' }}><Lock size={15} style={{ verticalAlign: -2 }} /> Записка-сюрприз. Её можно будет прочитать {n.open_at ? fmtDateTime(n.open_at) : 'позже'}.</p> : <p>{n.text}</p>}
-              {n.mine && <button className="x-btn" style={{ marginTop: 8, padding: 0 }} onClick={async () => { await del(`/notes/${n.id}`); reload(); }}><Trash2 size={15} /></button>}
+              {n.mine && <RowActions onEdit={() => setEdit(n)} onDelete={async () => { await del(`/notes/${n.id}`); reload(); }} />}
             </div>
           ))}
         </div>
@@ -139,6 +158,25 @@ function Notes() {
         <Empty icon={<Mail size={26} />} title="Записок пока нет" text="Напишите партнёру пару тёплых слов — можно с открытием в назначенное время" />
       )}
       {adding && <NoteSheet onClose={() => setAdding(false)} onSaved={() => { setAdding(false); reload(); }} />}
+      {edit && (
+        <EditSheet
+          title="Записка"
+          value={{ text: edit.text || '', open_local: edit.open_at ? new Date(edit.open_at * 1000).toISOString().slice(0, 16) : '' }}
+          fields={[
+            { k: 'text', label: 'Текст', type: 'textarea' },
+            { k: 'open_local', label: 'Открыть позже', placeholder: 'ГГГГ-ММ-ДДTЧЧ:ММ', hint: 'Пусто — видно сразу' },
+          ]}
+          onClose={() => setEdit(null)}
+          onSave={async (p) => {
+            const body: any = {};
+            if (p.text !== undefined) body.text = p.text;
+            if (p.open_local !== undefined) body.open_at = p.open_local ? Math.floor(new Date(p.open_local).getTime() / 1000) : null;
+            await patch(`/notes/${edit.id}`, body);
+            reload();
+          }}
+          onDelete={async () => { await del(`/notes/${edit.id}`); reload(); }}
+        />
+      )}
     </>
   );
 }
