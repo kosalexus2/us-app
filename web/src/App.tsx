@@ -4,6 +4,7 @@ import { useResource } from './api';
 import { Ctx, Tab } from './ctx';
 import { Avatar, Skeletons, ToastProvider } from './components/ui';
 import { FriendsButton } from './components/Friends';
+import HomeHint from './components/HomeHint';
 import InviteScreen from './pages/Invite';
 import QuickAdd from './components/QuickAdd';
 import Onboarding from './pages/Onboarding';
@@ -94,6 +95,8 @@ function Shell() {
             {boot.partner && <Avatar user={boot.partner} dot />}
           </div>
         </header>
+
+        <HomeHint />
 
         <main key={nav.tab}>
           {nav.tab === 'today' && <TodayPage />}
