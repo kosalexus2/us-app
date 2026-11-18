@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUp, Check, ChefHat, ChevronDown, ChevronUp, ListChecks, Repeat, ShoppingCart, Trash2, Dices } from 'lucide-react';
+import { ArrowUp, Check, ChefHat, ChevronDown, ChevronUp, ListChecks, Repeat, ShoppingCart, Trash2, Dices, Link2 } from 'lucide-react';
 import { del, patch, post, useResource } from '../api';
 import { Empty, Segmented, Sheet, Skeletons, useToast } from '../components/ui';
 import type { Chore, Recipe, Shop } from '../types';
@@ -194,7 +194,13 @@ function Recipes() {
                 <h3 style={{ fontSize: 17 }}>{r.title}</h3>
                 <button className="x-btn" aria-label="Удалить" onClick={async () => { await del(`/recipes/${r.id}`); reload(); }}><Trash2 size={16} /></button>
               </div>
+              {r.image_url && <img className="recipe-img" src={r.image_url} alt="" referrerPolicy="no-referrer" loading="lazy" />}
               {r.note && <p className="sub" style={{ whiteSpace: 'pre-wrap' }}>{r.note}</p>}
+              {r.url && (
+                <a className="wish-link" style={{ padding: '8px 0 0' }} href={r.url} target="_blank" rel="noreferrer noopener">
+                  <Link2 size={13} /> открыть рецепт
+                </a>
+              )}
             </div>
           ))}
         </div>
@@ -218,13 +224,60 @@ function Recipes() {
 function RecipeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
+  const [url, setUrl] = useState('');
+  const [image, setImage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  // Вставил ссылку — подтянулись название и картинка-превью.
+  const preview = async (raw: string) => {
+    const u = raw.trim();
+    if (!u) return;
+    setLoading(true);
+    try {
+      const p = await post<{ url: string; title: string; image: string }>('/link-preview', { url: u });
+      setUrl(p.url);
+      if (p.image) setImage(p.image);
+      if (p.title && !title.trim()) setTitle(p.title);
+      if (!p.title && !p.image) toast('Ссылка сохранится, но превью нет');
+    } catch (e: any) {
+      toast(e.message === 'bad_url' ? 'Ссылка выглядит неправильно' : 'Не удалось загрузить превью');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Sheet title="Новый рецепт" onClose={onClose}>
+      <label className="label">Ссылка на рецепт</label>
+      <div className="field">
+        <input value={url} onChange={(e) => setUrl(e.target.value)} onBlur={(e) => preview(e.target.value)} placeholder="Вставьте ссылку" inputMode="url" autoCapitalize="off" />
+        <button className="send" disabled={!url.trim() || loading} onClick={() => preview(url)} aria-label="Загрузить превью">
+          {loading ? <span className="spinner" /> : <Link2 size={17} />}
+        </button>
+      </div>
+      {image && (
+        <div className="preview-card">
+          <img src={image} alt="" referrerPolicy="no-referrer" />
+          <button className="icon-btn" onClick={() => setImage('')} aria-label="Убрать картинку"><Trash2 size={15} /></button>
+        </div>
+      )}
       <label className="label">Название</label>
-      <input className="input" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Паста карбонара" />
+      <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Паста карбонара" />
       <label className="label">Ингредиенты или заметка</label>
       <textarea className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Яйца, пармезан, гуанчале…" />
-      <button className="btn primary block" style={{ marginTop: 16 }} disabled={!title.trim()} onClick={async () => { await post('/recipes', { title, note }); onSaved(); }}>Сохранить</button>
+      <button
+        className="btn primary block"
+        style={{ marginTop: 16 }}
+        disabled={!title.trim() || busy}
+        onClick={async () => {
+          setBusy(true);
+          try { await post('/recipes', { title, note, url: url.trim() || null, image_url: image || null }); onSaved(); }
+          catch { toast('Не получилось, попробуйте ещё раз'); }
+          finally { setBusy(false); }
+        }}
+      >Сохранить</button>
     </Sheet>
   );
 }
