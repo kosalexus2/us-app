@@ -215,7 +215,7 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
 
   // ---------- shopping ----------
   app.get('/api/shopping', guarded, async (req) =>
-    q('SELECT s.*, u.name AS done_by_name FROM shopping s LEFT JOIN users u ON u.id = s.done_by WHERE s.couple_id = ? ORDER BY s.done ASC, s.id DESC')
+    q('SELECT s.*, u.name AS done_by_name FROM shopping s LEFT JOIN users u ON u.id = s.done_by WHERE s.couple_id = ? ORDER BY s.done ASC, COALESCE(s.pos, -s.id) ASC')
       .all(req.tgUser.couple_id),
   );
   app.post('/api/shopping', guarded, async (req) => {
@@ -230,8 +230,14 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
   });
   app.patch('/api/shopping/:id', guarded, async (req) => {
     const me = req.tgUser;
-    const done = req.body?.done ? 1 : 0;
-    q('UPDATE shopping SET done = ?, done_by = ? WHERE id = ? AND couple_id = ?').run(done, done ? me.id : null, req.params.id, me.couple_id);
+    if (req.body?.done !== undefined) {
+      const done = req.body.done ? 1 : 0;
+      q('UPDATE shopping SET done = ?, done_by = ? WHERE id = ? AND couple_id = ?').run(done, done ? me.id : null, req.params.id, me.couple_id);
+    }
+    if (req.body?.title !== undefined) {
+      const title = need(clean(req.body.title, 120));
+      q('UPDATE shopping SET title = ?, category = ? WHERE id = ? AND couple_id = ?').run(title, guessCategory(title), req.params.id, me.couple_id);
+    }
     return { ok: true };
   });
   app.delete('/api/shopping/:id', guarded, async (req) => {
@@ -245,22 +251,40 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
 
   // ---------- chores ----------
   app.get('/api/chores', guarded, async (req) =>
-    q('SELECT * FROM chores WHERE couple_id = ? ORDER BY done ASC, id DESC').all(req.tgUser.couple_id),
+    q('SELECT * FROM chores WHERE couple_id = ? ORDER BY done ASC, COALESCE(pos, -id) ASC').all(req.tgUser.couple_id),
   );
   app.post('/api/chores', guarded, async (req) => {
     const me = req.tgUser;
     const title = need(clean(req.body?.title, 160));
     const repeat = Number(req.body?.repeat_days) || null;
-    q('INSERT INTO chores (couple_id, title, due_date, repeat_days, added_by, created_at) VALUES (?,?,?,?,?,?)')
-      .run(me.couple_id, title, clean(req.body?.due_date, 10) || null, repeat, me.id, now());
+    const rule = ['morning', 'day_before', 'week_before'].includes(req.body?.remind_rule) ? req.body.remind_rule : null;
+    const r = q('INSERT INTO chores (couple_id, title, due_date, repeat_days, remind_rule, added_by, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(me.couple_id, title, clean(req.body?.due_date, 10) || null, repeat, rule, me.id, now());
     log(req, 'chore', `добавил(а) дело «${title}»`, { push: false });
-    return { ok: true };
+    return { ok: true, id: r.lastInsertRowid };
   });
   app.patch('/api/chores/:id', guarded, async (req) => {
     const me = req.tgUser;
-    const done = req.body?.done ? 1 : 0;
     const c = q('SELECT * FROM chores WHERE id = ? AND couple_id = ?').get(req.params.id, me.couple_id);
     if (!c) return { ok: false };
+    // правка полей дела: название, срок, повтор, напоминание
+    const f = {};
+    if (req.body?.title !== undefined) f.title = need(clean(req.body.title, 160));
+    if (req.body?.due_date !== undefined) {
+      const d = clean(req.body.due_date, 10);
+      need(!d || /^\d{4}-\d{2}-\d{2}$/.test(d), 'bad_date');
+      f.due_date = d || null;
+      f.reminded_on = null;
+    }
+    if (req.body?.repeat_days !== undefined) f.repeat_days = Number(req.body.repeat_days) || null;
+    if (req.body?.remind_rule !== undefined) {
+      f.remind_rule = ['morning', 'day_before', 'week_before'].includes(req.body.remind_rule) ? req.body.remind_rule : null;
+      f.reminded_on = null;
+    }
+    const cols = Object.keys(f);
+    if (cols.length) q(`UPDATE chores SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...cols.map((k) => f[k]), c.id);
+    if (req.body?.done === undefined) return { ok: true };
+    const done = req.body.done ? 1 : 0;
     if (done && c.repeat_days) {
       // recurring: roll the due date forward instead of closing
       const base = c.due_date && c.due_date > todayStr() ? c.due_date : todayStr();
