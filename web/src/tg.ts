@@ -39,3 +39,12 @@ export function startParam(): string | null {
 export const devUser: string | null =
   new URLSearchParams(location.search).get('dev') || localStorage.getItem('devUser');
 if (devUser) localStorage.setItem('devUser', devUser);
+
+/** «Добавить на главный экран» (Telegram 8.0+). Статус: 'added' | 'missed' | 'unknown' | 'unsupported'. */
+export function homeScreenStatus(cb: (s: string) => void) {
+  if (!WebApp?.checkHomeScreenStatus || !WebApp?.addToHomeScreen) return cb('unsupported');
+  try { WebApp.checkHomeScreenStatus((s: string) => cb(s)); } catch { cb('unsupported'); }
+}
+export function addToHomeScreen() {
+  try { WebApp?.addToHomeScreen?.(); } catch {}
+}
