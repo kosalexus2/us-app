@@ -7,6 +7,7 @@ export type AppCtx = {
   go: (tab: Tab, sub?: string) => void;
   reloadBoot: () => void;
   openEventSheet: () => void;
+  openPerson: (id: number) => void;
 };
 export const Ctx = createContext<AppCtx>(null as any);
 export const useApp = () => useContext(Ctx);
