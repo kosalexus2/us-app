@@ -55,6 +55,7 @@ await app.register(async (api) => {
   api.addHook('preHandler', authHook(botToken, devMode));
   registerRoutes(api, { botToken, webAppUrl, botUsername });
   (await import('./friends.js')).registerFriends(api, { botToken, webAppUrl });
+  (await import('./social.js')).registerSocial(api, { botToken, webAppUrl });
 });
 
 app.setErrorHandler((err, req, reply) => {
