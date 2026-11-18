@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Trash2, UserPlus, Users } from 'lucide-react';
+import { ChevronRight, Trash2, UserPlus, Users } from 'lucide-react';
 import { del, useResource } from '../api';
 import { useApp } from '../ctx';
 import { Avatar, Sheet, useToast } from './ui';
@@ -24,21 +24,22 @@ export function FriendsButton() {
   );
 }
 
-function Row({ user, sub, right }: { user: Partial<User>; sub?: string; right?: React.ReactNode }) {
+function Row({ user, sub, right, onOpen }: { user: Partial<User>; sub?: string; right?: React.ReactNode; onOpen?: () => void }) {
   return (
-    <div className="li">
+    <div className="li" onClick={onOpen} style={onOpen ? { cursor: 'pointer' } : undefined}>
       <Avatar user={user} dot />
       <div className="grow">
         <div className="title">{user.name}</div>
         {sub && <div style={{ fontSize: 13, color: 'var(--label-2)' }}>{sub}</div>}
       </div>
+      {onOpen && <ChevronRight size={18} style={{ color: 'var(--label-3)', flex: 'none' }} />}
       {right}
     </div>
   );
 }
 
 function FriendsSheet({ onClose }: { onClose: () => void; meId: number }) {
-  const { boot } = useApp();
+  const { boot, openPerson } = useApp();
   const { data, reload } = useResource<FriendsData>('/friends', 8000);
   const toast = useToast();
   const link = data && boot.bot_username ? `https://t.me/${boot.bot_username}/app?startapp=friend_${data.code}` : '';
@@ -57,9 +58,9 @@ function FriendsSheet({ onClose }: { onClose: () => void; meId: number }) {
     <Sheet title="Пара и друзья" onClose={onClose}>
       <p className="eyebrow">Пара</p>
       <div className="list">
-        <Row user={boot.me} sub="Это вы" />
+        <Row user={boot.me} sub="Это вы" onOpen={() => { onClose(); openPerson(boot.me.id); }} />
         {boot.partner ? (
-          <Row user={boot.partner} sub={boot.partner.online ? 'в сети' : undefined} />
+          <Row user={boot.partner} sub={boot.partner.online ? 'в сети' : undefined} onOpen={() => { onClose(); openPerson(boot.partner!.id); }} />
         ) : (
           <div className="li"><div className="grow" style={{ color: 'var(--label-2)' }}>Партнёр ещё не присоединился</div></div>
         )}
@@ -75,7 +76,8 @@ function FriendsSheet({ onClose }: { onClose: () => void; meId: number }) {
               key={f.id}
               user={f}
               sub={f.username ? `@${f.username}` : undefined}
-              right={<button className="icon-btn" onClick={() => remove(f)} aria-label="Убрать из друзей"><Trash2 size={16} /></button>}
+              onOpen={() => { onClose(); openPerson(f.id); }}
+              right={<button className="icon-btn" onClick={(e) => { e.stopPropagation(); remove(f); }} aria-label="Убрать из друзей"><Trash2 size={16} /></button>}
             />
           ))}
         </div>
