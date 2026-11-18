@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Check, Dices, EyeOff, MapPin, Plane, Plus, Search, Star, Trash2, Heart, RotateCw } from 'lucide-react';
-import { del, post, useResource } from '../api';
+import { del, patch, post, useResource } from '../api';
 import { useApp } from '../ctx';
+import { EditSheet, RowActions } from '../components/Editable';
 import { Empty, Segmented, Sheet, Skeletons, Switch, useToast } from '../components/ui';
 import type { EventT, Place } from '../types';
 import { fmtDate } from '../util';
@@ -99,12 +100,16 @@ function Places() {
 
 function PlaceCard({ p, onVisit, onChanged }: { p: Place; onVisit?: () => void; onChanged: () => void }) {
   const visited = p.status === 'visited';
+  const [edit, setEdit] = useState(false);
   return (
     <div className="card place">
       <div className="body">
         <div className="row1">
           {p.category ? <span className="badge gray">{p.category}</span> : <span />}
-          <button className="x-btn" aria-label="Удалить" onClick={async () => { if (confirm(`Удалить «${p.title}»?`)) { await del(`/places/${p.id}`); onChanged(); } }}><Trash2 size={16} /></button>
+          <RowActions
+            onEdit={() => setEdit(true)}
+            onDelete={async () => { if (confirm(`Удалить «${p.title}»?`)) { await del(`/places/${p.id}`); onChanged(); } }}
+          />
         </div>
         <h3>{p.title}</h3>
         {p.note && <p>{p.note}</p>}
@@ -122,6 +127,20 @@ function PlaceCard({ p, onVisit, onChanged }: { p: Place; onVisit?: () => void; 
           <button className="badge" onClick={onVisit}><Check size={11} /> Были здесь</button>
         )}
       </div>
+      {edit && (
+        <EditSheet
+          title="Место"
+          value={{ title: p.title, category: p.category || '', note: p.note || '' }}
+          fields={[
+            { k: 'title', label: 'Название' },
+            { k: 'category', label: 'Категория', placeholder: 'кафе, парк, музей' },
+            { k: 'note', label: 'Заметка', type: 'textarea' },
+          ]}
+          onClose={() => setEdit(false)}
+          onSave={async (patchBody) => { await patch(`/places/${p.id}`, patchBody); onChanged(); }}
+          onDelete={async () => { await del(`/places/${p.id}`); onChanged(); }}
+        />
+      )}
     </div>
   );
 }
@@ -180,9 +199,12 @@ function Dates() {
 }
 
 // ---------------------------------------------------------------- events
+const EVENT_REMIND: [any, string][] = [[null, 'без напоминания'], ['morning', 'утром в день'], ['day_before', 'за день'], ['week_before', 'за неделю'], ['two_hours', 'за 2 часа']];
+
 function Events({ only }: { only?: string }) {
   const { openEventSheet } = useApp();
   const { data, reload } = useResource<EventT[]>('/events', 6000);
+  const [edit, setEdit] = useState<EventT | null>(null);
   if (!data) return <Skeletons n={2} />;
   const today = new Date().toISOString().slice(0, 10);
   const list = data.filter((e) => !only || e.kind === only);
@@ -191,8 +213,8 @@ function Events({ only }: { only?: string }) {
   const Row = ({ e }: { e: EventT }) => (
     <div className="li">
       <span className="round-ic gray">{e.kind === 'trip' ? <Plane size={18} /> : <Calendar size={18} />}</span>
-      <div className="grow"><div className="title">{e.title}</div><div className="sub" style={{ marginTop: 0 }}>{fmtDate(e.date)}{e.time ? `, ${e.time}` : ''}{e.yearly ? ' · каждый год' : ''}</div></div>
-      <button className="x-btn" aria-label="Удалить" onClick={async () => { await del(`/events/${e.id}`); reload(); }}><Trash2 size={16} /></button>
+      <div className="grow"><div className="title">{e.title}</div><div className="sub" style={{ marginTop: 0 }}>{fmtDate(e.date)}{e.time ? `, ${e.time}` : ''}{e.yearly ? ' · каждый год' : ''}{e.remind_rule ? ' · напомню' : ''}</div></div>
+      <RowActions onEdit={() => setEdit(e)} onDelete={async () => { await del(`/events/${e.id}`); reload(); }} />
     </div>
   );
   return (
@@ -209,6 +231,22 @@ function Events({ only }: { only?: string }) {
           <div className="sec-head"><h2>Прошедшие</h2></div>
           <div className="list" style={{ opacity: 0.7 }}>{past.map((e) => <Row key={e.id} e={e} />)}</div>
         </>
+      )}
+      {edit && (
+        <EditSheet
+          title="Событие"
+          value={{ title: edit.title, date: edit.date, time: edit.time || '', yearly: !!edit.yearly, remind_rule: edit.remind_rule ?? null }}
+          fields={[
+            { k: 'title', label: 'Название' },
+            { k: 'date', label: 'Дата', type: 'date' },
+            { k: 'time', label: 'Время', type: 'time' },
+            { k: 'yearly', label: 'Каждый год', type: 'switch', hint: 'Годовщина повторяется' },
+            { k: 'remind_rule', label: 'Напоминание', type: 'chips', options: EVENT_REMIND, hint: 'Придёт обоим в Telegram' },
+          ]}
+          onClose={() => setEdit(null)}
+          onSave={async (p) => { await patch(`/events/${edit.id}`, p); reload(); }}
+          onDelete={async () => { await del(`/events/${edit.id}`); reload(); }}
+        />
       )}
     </>
   );
