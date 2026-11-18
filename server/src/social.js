@@ -1,7 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { db, now } from './db.js';
-import { notify } from './bot.js';
+import { hooks, notify } from './bot.js';
 
 // Люди и их календари: карточка человека (партнёр/друг/я), вишлист по ссылкам с превью,
 // личный календарь, предложения изменений с подтверждением, права и напоминания от бота.
@@ -219,6 +219,8 @@ async function linkPreview(raw) {
   previewCache.set(u.href, out);
   return out;
 }
+
+hooks.linkPreview = linkPreview; // бот берёт отсюда разбор присланных ссылок
 
 // ---------- модуль ----------
 export function registerSocial(api, { botToken, webAppUrl }) {
