@@ -63,6 +63,12 @@ app.setErrorHandler((err, req, reply) => {
   reply.code(500).send({ error: 'server_error' });
 });
 
+// Иконки приложения (для «на главный экран»)
+const { iconPng } = await import('./icons.js');
+for (const [path, size] of [['/icon-192.png', 192], ['/icon-512.png', 512], ['/apple-touch-icon.png', 180], ['/favicon.png', 64]]) {
+  app.get(path, (req, reply) => reply.header('Cache-Control', 'public, max-age=86400').type('image/png').send(iconPng(size)));
+}
+
 // Static frontend (built by `npm run build` in /web)
 const dist = resolve(__dirname, '../../web/dist');
 if (existsSync(dist)) {
