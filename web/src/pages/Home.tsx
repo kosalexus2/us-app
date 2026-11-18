@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUp, Check, ChefHat, ChevronDown, ChevronUp, ListChecks, Repeat, ShoppingCart, Trash2, Dices, Link2 } from 'lucide-react';
 import { del, patch, post, useResource } from '../api';
 import { Empty, Segmented, Sheet, Skeletons, useToast } from '../components/ui';
+import { EditSheet, RowActions, Sortable } from '../components/Editable';
 import type { Chore, Recipe, Shop } from '../types';
 import { fmtDate } from '../util';
 import { haptic } from '../tg';
@@ -45,6 +46,7 @@ function AddRow({ placeholder, onAdd }: { placeholder: string; onAdd: (v: string
 function Shopping() {
   const { data, reload, setData } = useResource<Shop[]>('/shopping', 3000);
   const [showDone, setShowDone] = useState(false);
+  const [edit, setEdit] = useState<Shop | null>(null);
   if (!data) return <Skeletons n={2} />;
   const open = data.filter((s) => !s.done);
   const done = data.filter((s) => s.done);
@@ -52,6 +54,11 @@ function Shopping() {
   const chips = SUGGEST.filter((s) => !names.has(s.toLowerCase())).slice(0, 6);
 
   const add = async (t: string) => { await post('/shopping', { title: t }); reload(); };
+  const reorder = async (ids: number[]) => {
+    setData([...ids.map((id) => data.find((x) => x.id === id)!).filter(Boolean), ...done]);
+    await post('/reorder', { list: 'shopping', ids });
+    reload();
+  };
   const toggle = async (s: Shop) => {
     haptic.tap();
     setData(data.map((x) => (x.id === s.id ? { ...x, done: s.done ? 0 : 1 } : x))); // optimistic
@@ -69,16 +76,23 @@ function Shopping() {
       )}
       <div style={{ marginTop: 16 }}>
         {open.length ? (
-          <div className="list">
-            {open.map((s) => (
-              <div className="li" key={s.id}>
+          <Sortable
+            className="list"
+            items={open}
+            onReorder={reorder}
+            render={(s, handle) => (
+              <div className="li">
+                {handle}
                 <button className="check" onClick={() => toggle(s)} aria-label="Купили" />
                 <div className="grow"><div className="title">{s.title}</div></div>
                 {s.category && <span className="badge gray">{s.category}</span>}
-                <button className="x-btn" aria-label="Удалить" onClick={async () => { await del(`/shopping/${s.id}`); reload(); }}><Trash2 size={16} /></button>
+                <RowActions
+                  onEdit={() => setEdit(s)}
+                  onDelete={async () => { await del(`/shopping/${s.id}`); reload(); }}
+                />
               </div>
-            ))}
-          </div>
+            )}
+          />
         ) : (
           <Empty icon={<ShoppingCart size={26} />} title="Список пуст" text="Добавьте, что нужно купить — партнёр увидит сразу" />
         )}
@@ -103,13 +117,28 @@ function Shopping() {
           )}
         </>
       )}
+
+      {edit && (
+        <EditSheet
+          title="Покупка"
+          value={{ title: edit.title }}
+          fields={[{ k: 'title', label: 'Что купить' }]}
+          onClose={() => setEdit(null)}
+          onSave={async (p) => { await patch(`/shopping/${edit.id}`, p); reload(); }}
+          onDelete={async () => { await del(`/shopping/${edit.id}`); reload(); }}
+        />
+      )}
     </>
   );
 }
 
+const CHORE_REMIND: [any, string][] = [[null, 'без напоминания'], ['morning', 'утром в день'], ['day_before', 'за день'], ['week_before', 'за неделю']];
+const CHORE_REPEAT: [any, string][] = [[null, 'разовое'], [1, 'каждый день'], [7, 'раз в неделю'], [14, 'раз в 2 недели'], [30, 'раз в месяц']];
+
 function Chores() {
   const { data, reload, setData } = useResource<Chore[]>('/chores', 4000);
   const [sheet, setSheet] = useState(false);
+  const [edit, setEdit] = useState<Chore | null>(null);
   if (!data) return <Skeletons n={2} />;
   const today = new Date().toISOString().slice(0, 10);
   const toggle = async (c: Chore) => {
@@ -123,29 +152,57 @@ function Chores() {
       <AddRow placeholder="Новое дело…" onAdd={async (t) => { await post('/chores', { title: t }); reload(); }} />
       <div style={{ marginTop: 16 }}>
         {data.length ? (
-          <div className="list">
-            {data.map((c) => (
-              <div className={`li ${c.done ? 'done' : ''}`} key={c.id}>
+          <Sortable
+            className="list"
+            items={data}
+            onReorder={async (ids) => {
+              setData(ids.map((id) => data.find((x) => x.id === id)!).filter(Boolean));
+              await post('/reorder', { list: 'chores', ids });
+              reload();
+            }}
+            render={(c, handle) => (
+              <div className={`li ${c.done ? 'done' : ''}`}>
+                {handle}
                 <button className="check" onClick={() => toggle(c)} aria-label="Готово">{c.done ? <Check size={15} /> : null}</button>
                 <div className="grow">
                   <div className="title">{c.title}</div>
-                  {(c.due_date || c.repeat_days) && (
+                  {(c.due_date || c.repeat_days || c.remind_rule) && (
                     <div className="sub" style={{ marginTop: 0, color: c.due_date && c.due_date < today && !c.done ? 'var(--accent)' : undefined }}>
-                      {c.due_date ? fmtDate(c.due_date) : ''}{c.repeat_days ? ` · каждые ${c.repeat_days} дн.` : ''}
+                      {c.due_date ? fmtDate(c.due_date) : ''}
+                      {c.repeat_days ? ` · каждые ${c.repeat_days} дн.` : ''}
+                      {c.remind_rule ? ' · напомню' : ''}
                     </div>
                   )}
                 </div>
                 {c.repeat_days ? <Repeat size={15} color="var(--label-3)" /> : null}
-                <button className="x-btn" aria-label="Удалить" onClick={async () => { await del(`/chores/${c.id}`); reload(); }}><Trash2 size={16} /></button>
+                <RowActions
+                  onEdit={() => setEdit(c)}
+                  onDelete={async () => { await del(`/chores/${c.id}`); reload(); }}
+                />
               </div>
-            ))}
-          </div>
+            )}
+          />
         ) : (
           <Empty icon={<ListChecks size={26} />} title="Дел пока нет" text="Разовые и повторяющиеся домашние дела" />
         )}
       </div>
       <button className="btn soft block" style={{ marginTop: 14 }} onClick={() => setSheet(true)}><Repeat size={18} /> Повторяющееся дело</button>
       {sheet && <RepeatSheet onClose={() => setSheet(false)} onSaved={() => { setSheet(false); reload(); }} />}
+      {edit && (
+        <EditSheet
+          title="Дело"
+          value={{ title: edit.title, due_date: edit.due_date || '', repeat_days: edit.repeat_days ?? null, remind_rule: edit.remind_rule ?? null }}
+          fields={[
+            { k: 'title', label: 'Что сделать' },
+            { k: 'due_date', label: 'Срок', type: 'date' },
+            { k: 'repeat_days', label: 'Повтор', type: 'chips', options: CHORE_REPEAT },
+            { k: 'remind_rule', label: 'Напоминание', type: 'chips', options: CHORE_REMIND, hint: 'Придёт в Telegram от бота' },
+          ]}
+          onClose={() => setEdit(null)}
+          onSave={async (p) => { await patch(`/chores/${edit.id}`, p); reload(); }}
+          onDelete={async () => { await del(`/chores/${edit.id}`); reload(); }}
+        />
+      )}
     </>
   );
 }
@@ -175,6 +232,7 @@ function RepeatSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 function Recipes() {
   const { data, reload } = useResource<Recipe[]>('/recipes', 8000);
   const [adding, setAdding] = useState(false);
+  const [edit, setEdit] = useState<Recipe | null>(null);
   const [pick, setPick] = useState<Recipe | null>(null);
   const toast = useToast();
   if (!data) return <Skeletons n={2} />;
@@ -192,7 +250,7 @@ function Recipes() {
             <div className="card" key={r.id}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <h3 style={{ fontSize: 17 }}>{r.title}</h3>
-                <button className="x-btn" aria-label="Удалить" onClick={async () => { await del(`/recipes/${r.id}`); reload(); }}><Trash2 size={16} /></button>
+                <RowActions onEdit={() => setEdit(r)} onDelete={async () => { await del(`/recipes/${r.id}`); reload(); }} />
               </div>
               {r.image_url && <img className="recipe-img" src={r.image_url} alt="" referrerPolicy="no-referrer" loading="lazy" />}
               {r.note && <p className="sub" style={{ whiteSpace: 'pre-wrap' }}>{r.note}</p>}
@@ -208,6 +266,21 @@ function Recipes() {
         <Empty icon={<ChefHat size={26} />} title="Рецептов пока нет" text="Сохраняйте блюда, которые хочется приготовить вместе" action={<button className="btn primary" onClick={() => setAdding(true)}>Добавить рецепт</button>} />
       )}
       {adding && <RecipeSheet onClose={() => setAdding(false)} onSaved={() => { setAdding(false); reload(); }} />}
+      {edit && (
+        <EditSheet
+          title="Рецепт"
+          value={{ title: edit.title, note: edit.note || '', url: edit.url || '', image_url: edit.image_url || '' }}
+          fields={[
+            { k: 'title', label: 'Название' },
+            { k: 'note', label: 'Ингредиенты или заметка', type: 'textarea' },
+            { k: 'url', label: 'Ссылка', type: 'url' },
+            { k: 'image_url', label: 'Картинка (ссылка)', type: 'url' },
+          ]}
+          onClose={() => setEdit(null)}
+          onSave={async (p) => { await patch(`/recipes/${edit.id}`, p); reload(); }}
+          onDelete={async () => { await del(`/recipes/${edit.id}`); reload(); }}
+        />
+      )}
       {pick && (
         <Sheet title="Готовим сегодня?" onClose={() => setPick(null)}>
           <div className="card" style={{ boxShadow: 'none', background: 'var(--canvas)', marginTop: 12 }}>
