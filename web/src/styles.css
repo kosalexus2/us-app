@@ -306,3 +306,19 @@ textarea.input { resize: none; min-height: 90px; }
 .btn.grow { flex: 1; }
 .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- правка и перетаскивание списков ---------- */
+.list .srow + .srow .li { border-top: 0.5px solid var(--sep); margin-left: 16px; padding-left: 0; }
+.srow.dragging .li { background: var(--accent-faint); }
+.srow.dragging { position: relative; z-index: 2; }
+.drag-handle {
+  flex: none; width: 26px; height: 34px; display: grid; place-items: center; margin-left: -8px;
+  color: var(--label-3); touch-action: none; cursor: grab;
+}
+.drag-handle:active { cursor: grabbing; color: var(--accent); }
+.row-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.row-actions .icon-btn { width: 32px; height: 32px; color: var(--label-3); }
+.row-actions .icon-btn:active { color: var(--accent); }
+.btn.ghost.danger { color: var(--accent); }
+.note-card .row-actions { margin-top: 6px; margin-left: -6px; }
+.place .row-actions { margin-right: -6px; }
