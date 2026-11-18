@@ -283,8 +283,8 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
   app.post('/api/recipes', guarded, async (req) => {
     const me = req.tgUser;
     const title = need(clean(req.body?.title, 120));
-    q('INSERT INTO recipes (couple_id, title, note, added_by, created_at) VALUES (?,?,?,?,?)')
-      .run(me.couple_id, title, clean(req.body?.note, 600) || null, me.id, now());
+    q('INSERT INTO recipes (couple_id, title, note, url, image_url, added_by, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(me.couple_id, title, clean(req.body?.note, 600) || null, clean(req.body?.url, 500) || null, clean(req.body?.image_url, 600) || null, me.id, now());
     log(req, 'recipe', `сохранил(а) рецепт «${title}»`, { push: false });
     return { ok: true };
   });
