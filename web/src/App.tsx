@@ -5,6 +5,9 @@ import { Ctx, Tab } from './ctx';
 import { Avatar, Skeletons, ToastProvider } from './components/ui';
 import { FriendsButton } from './components/Friends';
 import HomeHint from './components/HomeHint';
+import { InboxButton } from './components/Inbox';
+import Assistant from './components/Assistant';
+import Person from './pages/Person';
 import InviteScreen from './pages/Invite';
 import QuickAdd from './components/QuickAdd';
 import Onboarding from './pages/Onboarding';
@@ -37,16 +40,24 @@ function Shell() {
   const [eventSheet, setEventSheet] = useState(false);
   const [solo, setSolo] = useState(false);
   const [inviteDone, setInviteDone] = useState(false);
+  const [person, setPerson] = useState<number | null>(null);
 
   const go = useCallback((tab: Tab, sub?: string) => {
     haptic.tap();
     setNav({ tab, sub });
+    setPerson(null);
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  const openPerson = useCallback((id: number) => {
+    haptic.tap();
+    setPerson(id);
     window.scrollTo({ top: 0 });
   }, []);
 
   const ctx = useMemo(
-    () => (boot ? { boot, go, reloadBoot: reload, openEventSheet: () => setEventSheet(true) } : null),
-    [boot, go, reload],
+    () => (boot ? { boot, go, reloadBoot: reload, openEventSheet: () => setEventSheet(true), openPerson } : null),
+    [boot, go, reload, openPerson],
   );
 
   if (error?.status === 401) {
@@ -90,20 +101,29 @@ function Shell() {
         <header className="topbar">
           <span className="brand">Us App</span>
           <div className="avatars">
+            <InboxButton />
             <FriendsButton />
-            <Avatar user={boot.me} dot />
-            {boot.partner && <Avatar user={boot.partner} dot />}
+            <button className="av-btn" onClick={() => openPerson(boot.me.id)} aria-label="Мой профиль"><Avatar user={boot.me} dot /></button>
+            {boot.partner && (
+              <button className="av-btn" onClick={() => openPerson(boot.partner!.id)} aria-label={boot.partner.name}><Avatar user={boot.partner} dot /></button>
+            )}
           </div>
         </header>
 
         <HomeHint />
 
+        {person !== null ? (
+          <main key={`person-${person}`}>
+            <Person id={person} onBack={() => setPerson(null)} />
+          </main>
+        ) : (
         <main key={nav.tab}>
           {nav.tab === 'today' && <TodayPage />}
           {nav.tab === 'together' && <Together sub={nav.sub} />}
           {nav.tab === 'home' && <Home sub={nav.sub} />}
           {nav.tab === 'memory' && <Memory sub={nav.sub} />}
         </main>
+        )}
 
         <nav className="nav" aria-label="Разделы">
           {TABS.slice(0, 2).map(([t, label, Icon]) => (
@@ -118,6 +138,8 @@ function Shell() {
             </button>
           ))}
         </nav>
+
+        {person === null && <Assistant onDone={reload} />}
 
         {quick && <QuickAdd onClose={() => setQuick(false)} onDone={(t, s) => { setQuick(false); go(t, s); }} />}
         {eventSheet && <EventSheet onClose={() => setEventSheet(false)} onSaved={() => setEventSheet(false)} />}
