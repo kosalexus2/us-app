@@ -136,14 +136,16 @@ async function assertPublic(u) {
   const r = await dns.lookup(host, { all: true });
   if (!r.length || r.some((x) => isPrivateIp(x.address))) throw bad('bad_url');
 }
-async function fetchHtml(url) {
+const BOT_UA = 'TelegramBot (like TwitterBot)';
+const BROWSER_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+async function fetchHtml(url, ua = BOT_UA) {
   let u = new URL(url);
   for (let hop = 0; hop < 4; hop++) {
     await assertPublic(u);
     const res = await fetch(u, {
       redirect: 'manual',
       signal: AbortSignal.timeout(6000),
-      headers: { 'user-agent': 'TelegramBot (like TwitterBot)', accept: 'text/html,*/*;q=0.8', 'accept-language': 'ru,en;q=0.8' },
+      headers: { 'user-agent': ua, accept: 'text/html,*/*;q=0.8', 'accept-language': 'ru,en;q=0.8' },
     });
     if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
       u = new URL(res.headers.get('location'), u);
@@ -180,6 +182,35 @@ function metaOf(html, names) {
   }
   return '';
 }
+// Картинка из разметки schema.org (JSON-LD): у многих магазинов нет og:image, зато есть Product.image.
+function jsonLdImage(html) {
+  const re = /<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  const pick = (v) => {
+    if (!v) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) { for (const x of v) { const r = pick(x); if (r) return r; } return ''; }
+    if (typeof v === 'object') return pick(v.url || v.contentUrl || '');
+    return '';
+  };
+  const walk = (n, depth = 0) => {
+    if (!n || depth > 6) return '';
+    if (Array.isArray(n)) { for (const x of n) { const r = walk(x, depth + 1); if (r) return r; } return ''; }
+    if (typeof n !== 'object') return '';
+    const r = pick(n.image);
+    if (r) return r;
+    return walk(n['@graph'], depth + 1) || walk(n.mainEntity, depth + 1) || walk(n.itemListElement, depth + 1);
+  };
+  while ((m = re.exec(html))) {
+    try { const r = walk(JSON.parse(m[1].trim())); if (r) return r; } catch { /* битый JSON — идём дальше */ }
+  }
+  return '';
+}
+function linkRelImage(html) {
+  const m = /<link[^>]+rel\s*=\s*["']image_src["'][^>]*>/i.exec(html);
+  const h = m && /href\s*=\s*["']([^"']+)["']/i.exec(m[0]);
+  return h ? unescapeHtml(h[1]).trim() : '';
+}
 const previewCache = new Map();
 async function linkPreview(raw) {
   let url = clean(raw, 800);
@@ -190,11 +221,16 @@ async function linkPreview(raw) {
   if (previewCache.has(u.href)) return previewCache.get(u.href);
   let out = { url: u.href, title: '', image: '', site: u.hostname.replace(/^www\./, ''), price: '' };
   try {
-    const { html, url: finalUrl } = await fetchHtml(u.href);
+    let { html, url: finalUrl } = await fetchHtml(u.href);
+    const hasImage = (h) => !!(h && (metaOf(h, ['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src']) || jsonLdImage(h) || linkRelImage(h)));
+    if (!hasImage(html)) {
+      // некоторые магазины отдают превью только обычному браузеру, пробуем ещё раз так
+      try { const r2 = await fetchHtml(u.href, BROWSER_UA); if (hasImage(r2.html) || (!html && r2.html)) { html = r2.html; finalUrl = r2.url; } } catch { /* оставляем первый ответ */ }
+    }
     if (html) {
       const base = new URL(finalUrl);
       const title = metaOf(html, ['og:title', 'twitter:title']) || unescapeHtml(/<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1] || '').trim();
-      let image = metaOf(html, ['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src']);
+      let image = metaOf(html, ['og:image', 'og:image:url', 'twitter:image', 'twitter:image:src']) || jsonLdImage(html) || linkRelImage(html);
       if (image) {
         try {
           const iu = new URL(image, base);
