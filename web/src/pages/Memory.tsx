@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Camera, Clapperboard, Gift, Lock, Mail, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Clapperboard, Gift, Lock, Mail, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { del, patch, post, useResource } from '../api';
 import { EditSheet, RowActions } from '../components/Editable';
+import Diary from '../components/Diary';
 import { useApp } from '../ctx';
 import { Empty, Segmented, Sheet, Skeletons, Switch } from '../components/ui';
 import type { Note, Wish } from '../types';
 import { fmtDateTime } from '../util';
 import { haptic } from '../tg';
 
-type Sub = 'wishlist' | 'notes' | 'memories';
+type Sub = 'diary' | 'wishlist' | 'notes';
 
 export default function Memory({ sub }: { sub?: string }) {
-  const [tab, setTab] = useState<Sub>((sub as Sub) || 'wishlist');
+  const [tab, setTab] = useState<Sub>((sub as Sub) || 'diary');
   useEffect(() => { if (sub) setTab(sub as Sub); }, [sub]);
   return (
     <div className="scroll">
       <h1 className="h-title">Память</h1>
-      <p className="sub">Желания, записки и то, что хочется сохранить</p>
-      <Segmented<Sub> value={tab} onChange={setTab} options={[['wishlist', 'Вишлист'], ['notes', 'Записки'], ['memories', 'Воспоминания']]} />
+      <p className="sub">Дневник, желания и записки</p>
+      <Segmented<Sub> value={tab} onChange={setTab} options={[['diary', 'Дневник'], ['wishlist', 'Вишлист'], ['notes', 'Записки']]} />
+      {tab === 'diary' && <Diary />}
       {tab === 'wishlist' && <Wishlist />}
       {tab === 'notes' && <Notes />}
-      {tab === 'memories' && (
-        <Empty icon={<Camera size={26} />} title="Воспоминания — скоро" text="Здесь появятся ваши фото и истории. Пока можно сохранять места и оставлять записки." />
-      )}
     </div>
   );
 }
