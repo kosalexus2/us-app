@@ -22,7 +22,7 @@ function chunk(type, data) {
 
 export function iconPng(size) {
   if (cache.has(size)) return cache.get(size);
-  const bg = [255, 107, 94];
+  const bg = [91, 75, 242];
   const SS = 3; // сглаживание 3x3
   const raw = Buffer.alloc((size * 3 + 1) * size);
   const inHeart = (u, v) => {
