@@ -24,8 +24,8 @@ export function InboxButton() {
 
   return (
     <>
-      <button className="icon-btn bell" onClick={() => { haptic.tap(); setOpen(true); }} aria-label="Предложения">
-        <Bell size={17} />
+      <button className="top-btn" onClick={() => { haptic.tap(); setOpen(true); }} aria-label="Предложения">
+        <Bell size={21} strokeWidth={1.8} />
         {count > 0 && <span className="badge-dot">{count}</span>}
       </button>
       {open && createPortal(
