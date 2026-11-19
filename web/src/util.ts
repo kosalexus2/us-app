@@ -68,3 +68,24 @@ export function classifyQuick(raw: string): { kind: QuickKind; title: string } {
   }
   return { kind: 'shopping', title: t };
 }
+
+export const MOODS: [string, string][] = [['love', '😍'], ['great', '🙂'], ['ok', '😐'], ['sad', '😔'], ['angry', '😤']];
+export const MOOD_EMOJI: Record<string, string> = Object.fromEntries(MOODS);
+
+/** Сколько вместе: «1 год 3 месяца», меньше месяца — в днях. */
+export function togetherSpan(startIso: string, todayIso: string): { n: number; word: string }[] {
+  const [y1, m1, d1] = startIso.split('-').map(Number);
+  const [y2, m2, d2] = todayIso.split('-').map(Number);
+  let months = (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const out: { n: number; word: string }[] = [];
+  if (years) out.push({ n: years, word: plural(years, 'год', 'года', 'лет') });
+  if (rest) out.push({ n: rest, word: plural(rest, 'месяц', 'месяца', 'месяцев') });
+  if (!out.length) {
+    const days = Math.max(0, Math.round((Date.parse(todayIso) - Date.parse(startIso)) / 86400000));
+    out.push({ n: days, word: plural(days, 'день', 'дня', 'дней') });
+  }
+  return out;
+}
