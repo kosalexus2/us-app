@@ -56,4 +56,5 @@ npm test                # тесты (проверка подписи Telegram)
 ## Правила работы
 - Перед правкой UI смотреть макеты в `design-reference/`. Проверять в виде 390×844.
 - Любое изменение API сопровождать правкой типов в `web/src/types.ts`.
+- Проверка вёрстки полей (обязательно): каждое поле/кнопка/чип не шире контейнера на 390 px. Для `input[type=date|time]` в iOS задавать `min-width:0; max-width:100%; appearance:none`; ряды из двух полей делать `display:grid; grid-template-columns:minmax(0,1fr) ...`; горизонтальный скролл только у `.chips`/`.scroller`. Перед коммитом открыть каждую форму в 390×844 и проверить `document.documentElement.scrollWidth <= innerWidth` и что у всех `.sheet *` `getBoundingClientRect().right <= sheet.right`.
 - После изменений: `npm test` и `npm run build` должны проходить.
