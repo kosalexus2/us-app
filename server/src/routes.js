@@ -124,7 +124,7 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
 
     // upcoming events (yearly ones are projected onto the next occurrence)
     const upcoming = [];
-    const consider = (title, date, time, kind, yearly) => {
+    const consider = (title, date, time, kind, yearly, id = null) => {
       let d = date;
       if (yearly) {
         const [, m, dd] = date.split('-');
@@ -132,9 +132,9 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
         if (d < day) d = `${Number(day.slice(0, 4)) + 1}-${m}-${dd}`;
       }
       const inDays = dayDiff(day, d);
-      if (inDays >= 0 && inDays <= 90) upcoming.push({ title, date: d, time, kind, in_days: inDays });
+      if (inDays >= 0 && inDays <= 90) upcoming.push({ title, date: d, time, kind, in_days: inDays, id, src: id ? 'event' : null });
     };
-    for (const e of q('SELECT * FROM events WHERE couple_id = ?').all(cid)) consider(e.title, e.date, e.time, e.kind, e.yearly);
+    for (const e of q('SELECT * FROM events WHERE couple_id = ?').all(cid)) consider(e.title, e.date, e.time, e.kind, e.yearly, e.id);
     if (couple.start_date) consider('Годовщина', couple.start_date, null, 'anniversary', 1);
     upcoming.sort((a, b) => a.in_days - b.in_days);
 
