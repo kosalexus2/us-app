@@ -160,7 +160,7 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
 
   app.post('/api/mood', guarded, async (req) => {
     const mood = clean(req.body?.mood, 10);
-    need(['great', 'ok', 'sad'].includes(mood), 'bad_mood');
+    need(['love', 'great', 'ok', 'sad', 'angry'].includes(mood), 'bad_mood');
     q('INSERT INTO moods (couple_id, user_id, day, mood) VALUES (?,?,?,?) ON CONFLICT(couple_id,user_id,day) DO UPDATE SET mood = excluded.mood')
       .run(req.tgUser.couple_id, req.tgUser.id, todayStr(), mood);
     return { ok: true };
