@@ -4,7 +4,7 @@ import { useResource } from './api';
 import { Ctx, Tab } from './ctx';
 import { Avatar, Skeletons, ToastProvider } from './components/ui';
 import { FriendsButton } from './components/Friends';
-import HomeHint from './components/HomeHint';
+import HomeButton from './components/HomeHint';
 import { InboxButton } from './components/Inbox';
 import Assistant from './components/Assistant';
 import Person from './pages/Person';
@@ -103,14 +103,13 @@ function Shell() {
           <div className="avatars">
             <InboxButton />
             <FriendsButton />
+            <HomeButton />
             <button className="av-btn" onClick={() => openPerson(boot.me.id)} aria-label="Мой профиль"><Avatar user={boot.me} dot /></button>
             {boot.partner && (
               <button className="av-btn" onClick={() => openPerson(boot.partner!.id)} aria-label={boot.partner.name}><Avatar user={boot.partner} dot /></button>
             )}
           </div>
         </header>
-
-        <HomeHint />
 
         {person !== null ? (
           <main key={`person-${person}`}>
