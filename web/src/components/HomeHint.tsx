@@ -1,24 +1,46 @@
-import { useEffect, useState } from 'react';
-import { Smartphone, X } from 'lucide-react';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Share, Smartphone } from 'lucide-react';
+import { Sheet, useToast } from './ui';
 import { addToHomeScreen, homeScreenStatus } from '../tg';
+import { haptic } from '../tg';
 
-const KEY = 'homeHintHidden';
-
-/** Небольшая плашка «Добавить на главный экран»: показывается, пока ярлык не добавлен и плашку не закрыли. */
-export default function HomeHint() {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    try { if (localStorage.getItem(KEY)) return; } catch {}
-    homeScreenStatus((s) => setShow(s === 'missed' || s === 'unknown'));
-  }, []);
-  if (!show) return null;
-  const hide = () => { try { localStorage.setItem(KEY, '1'); } catch {} setShow(false); };
+/** Тихая кнопка в верхней панели: «Добавить на главный экран». Всегда на месте, ничего не загораживает. */
+export default function HomeButton() {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 16px 0' }}>
-      <Smartphone size={22} />
-      <div style={{ flex: 1, fontSize: 14 }}>Добавьте Us App на главный экран, чтобы открывать как обычное приложение</div>
-      <button className="btn soft sm" onClick={() => { addToHomeScreen(); hide(); }}>Добавить</button>
-      <button className="btn ghost sm" aria-label="Закрыть" onClick={hide}><X size={16} /></button>
-    </div>
+    <>
+      <button className="top-btn quiet" aria-label="Добавить на главный экран" onClick={() => { haptic.tap(); setOpen(true); }}>
+        <Share size={20} strokeWidth={1.6} />
+      </button>
+      {open && createPortal(<HomeSheet onClose={() => setOpen(false)} />, document.body)}
+    </>
+  );
+}
+
+function HomeSheet({ onClose }: { onClose: () => void }) {
+  const toast = useToast();
+  const add = () => {
+    homeScreenStatus((s) => {
+      if (s === 'added') {
+        toast('Ярлык уже на главном экране');
+      } else if (s === 'unsupported') {
+        toast('Откройте меню ⋯ в Telegram и выберите «Добавить на главный экран»');
+      } else {
+        addToHomeScreen();
+      }
+      onClose();
+    });
+  };
+  return (
+    <Sheet onClose={onClose}>
+      <div className="home-sheet">
+        <div className="big-ic"><Smartphone size={30} /></div>
+        <h2>Добавить на главный экран</h2>
+        <p>Откроется как обычное приложение, без Telegram</p>
+        <button className="btn primary block" onClick={add}>Добавить</button>
+        <button className="btn ghost block" style={{ marginTop: 6 }} onClick={onClose}>Не сейчас</button>
+      </div>
+    </Sheet>
   );
 }
