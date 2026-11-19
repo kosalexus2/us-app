@@ -1,18 +1,11 @@
 import { useState } from 'react';
-import { ArrowUp, CalendarHeart, Heart, Lock, Meh, Smile, Frown, Sparkles, UserPlus, Utensils, Cake, Plane, Calendar } from 'lucide-react';
+import { CalendarHeart, Heart, Lock, Sparkles, UserPlus, Utensils, Cake, Plane, Calendar } from 'lucide-react';
 import { post, useResource } from '../api';
 import { useApp } from '../ctx';
 import { Avatar, Sheet, Skeletons, useToast } from '../components/ui';
 import type { Today } from '../types';
-import { ago, fmtDate, fmtLongDate, greeting, inDaysLabel, plural } from '../util';
+import { ago, fmtDate, inDaysLabel, MOODS, MOOD_EMOJI, togetherSpan } from '../util';
 import { haptic, shareInvite } from '../tg';
-
-const MOODS: [string, string, any][] = [
-  ['great', 'Отлично', Smile],
-  ['ok', 'Норм', Meh],
-  ['sad', 'Грустно', Frown],
-];
-const MOOD_WORD: Record<string, string> = { great: 'отлично', ok: 'нормально', sad: 'грустно' };
 
 export default function TodayPage() {
   const { boot, go, reloadBoot } = useApp();
@@ -41,9 +34,7 @@ export default function TodayPage() {
 
   return (
     <div className="scroll">
-      <p className="eyebrow">{fmtLongDate()}</p>
-      <h1 className="h-display">{greeting()}, {me.first_name}</h1>
-
+      <div style={{ height: 16 }} />
       {!partner && (
         <div className="banner">
           <UserPlus size={20} color="var(--accent)" />
@@ -54,13 +45,13 @@ export default function TodayPage() {
         </div>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card">
         <div className="hero">
           <div>
             {data.days_together != null ? (
               <>
-                <div className="num">{data.days_together}</div>
-                <div className="cap">{plural(data.days_together, 'день', 'дня', 'дней')} вместе</div>
+                <Heart size={18} fill="var(--accent)" color="var(--accent)" />
+                <div className="num">Вместе {togetherSpan(data.start_date!, boot.today).map((p, i) => <span key={i}>{i ? ' ' : ''}<b>{p.n}</b> {p.word}</span>)}</div>
                 <div className="since">с {fmtDate(data.start_date!)}</div>
               </>
             ) : (
@@ -78,15 +69,17 @@ export default function TodayPage() {
           </div>
         </div>
 
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 600 }}>Как ты сегодня?</h3>
         <div className="moods" role="group" aria-label="Настроение">
-          {MOODS.map(([k, label, Icon]) => (
-            <button key={k} className={`mood ${data.mood.me === k ? 'on' : ''}`} onClick={() => setMood(k)}>
-              <Icon size={16} /> {label}
-            </button>
+          {MOODS.map(([k, emoji]) => (
+            <button key={k} className={`mood ${data.mood.me === k ? 'on' : ''}`} onClick={() => setMood(k)} aria-label={k}>{emoji}</button>
           ))}
         </div>
         {partner && data.mood.partner && (
-          <p className="mood-note">{partner.first_name} сегодня: {MOOD_WORD[data.mood.partner]}</p>
+          <p className="mood-note">{partner.first_name} сегодня: {MOOD_EMOJI[data.mood.partner] || ''}</p>
         )}
       </div>
 
@@ -104,18 +97,16 @@ export default function TodayPage() {
           </>
         ) : (
           <>
-            <div className="field flat">
-              <input value={answer} placeholder="Напиши свой ответ…" onChange={(e) => setAnswer(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendAnswer()} />
-              <button className="send" onClick={sendAnswer} disabled={!answer.trim()} aria-label="Отправить"><ArrowUp size={20} /></button>
-            </div>
-            <p className="hint"><Lock size={13} /> Ответ откроется, когда ответите оба{q.partner_answered ? ` — ${partner?.first_name} уже ответил(а)` : ''}</p>
+            <input className="input" value={answer} placeholder="Ваш ответ…" onChange={(e) => setAnswer(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendAnswer()} />
+            <button className="btn primary block" style={{ marginTop: 12 }} onClick={sendAnswer} disabled={!answer.trim()}>Ответить</button>
+            <p className="hint" style={{ justifyContent: 'center' }}><Lock size={13} /> Ответ {partner?.first_name || 'партнёра'} откроется, когда ответите оба{q.partner_answered ? ' — он уже ответил(а)' : ''}</p>
           </>
         )}
       </div>
 
       <div className="sec-head">
-        <h2>Скоро</h2>
-        <button className="link" onClick={() => go('together', 'calendar')}>Все планы</button>
+        <h2>Ближайшее</h2>
+        <button className="link" onClick={() => go('together', 'calendar')}>Всё</button>
       </div>
       {data.upcoming.length ? (
         <div className="scroller">
@@ -139,7 +130,7 @@ export default function TodayPage() {
         </button>
       )}
 
-      <div className="sec-head"><h2>Недавно</h2></div>
+      <div className="sec-head"><h2>Что нового</h2></div>
       {data.activity.length ? (
         <div className="card feed" style={{ padding: '4px 16px' }}>
           {data.activity.map((a) => (
