@@ -16,8 +16,8 @@ export function FriendsButton() {
 
   return (
     <>
-      <button className="btn soft sm" style={{ marginRight: 10 }} onClick={() => { haptic.tap(); setOpen(true); }} aria-label="Пара и друзья">
-        <Users size={16} /> Друзья
+      <button className="top-btn" onClick={() => { haptic.tap(); setOpen(true); }} aria-label="Пара и друзья">
+        <Users size={21} strokeWidth={1.8} />
       </button>
       {open && createPortal(<FriendsSheet onClose={() => setOpen(false)} meId={boot.me.id} />, document.body)}
     </>
