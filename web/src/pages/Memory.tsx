@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Clapperboard, Gift, Lock, Mail, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Clapperboard, Gift, Link2, Lock, Mail, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { del, patch, post, useResource } from '../api';
 import { EditSheet, RowActions } from '../components/Editable';
 import Diary from '../components/Diary';
 import { useApp } from '../ctx';
-import { Empty, Segmented, Sheet, Skeletons, Switch } from '../components/ui';
+import { Empty, Segmented, Sheet, Skeletons, Switch, useToast } from '../components/ui';
 import type { Note, Wish } from '../types';
 import { fmtDateTime } from '../util';
 import { haptic } from '../tg';
@@ -106,10 +106,49 @@ function Wishlist() {
 }
 
 export function AddWishSheet({ initial = 'gift', title: t0 = '', onClose, onSaved }: { initial?: Wish['kind']; title?: string; onClose: () => void; onSaved: () => void }) {
+  const toast = useToast();
   const [kind, setKind] = useState<Wish['kind']>(initial);
   const [title, setTitle] = useState(t0);
   const [price, setPrice] = useState('');
   const [url, setUrl] = useState('');
+  const [image, setImage] = useState('');
+  const [noImage, setNoImage] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Вставили ссылку: подтягиваем название, картинку и цену со страницы. Всё можно поправить руками.
+  const fetchPreview = async (raw: string) => {
+    const u = raw.trim();
+    if (!u || loading) return;
+    setLoading(true);
+    try {
+      const p = await post<{ url: string; title: string; image: string; price: string }>('/link-preview', { url: u });
+      setUrl(p.url);
+      if (p.title && !title.trim()) setTitle(p.title);
+      if (p.image) { setImage(p.image); setNoImage(false); }
+      if (p.price && !price.trim()) setPrice(p.price);
+      if (!p.image) toast('У страницы нет картинки, можно добавить свою ссылкой позже');
+    } catch {
+      toast('Не удалось загрузить превью, ссылка всё равно сохранится');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const save = async () => {
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    try {
+      // image_url: '' значит «картинки не надо», пропуск поля значит «возьми со страницы сам»
+      await post('/wishes', { kind, title, price, url, ...(url.trim() && !image && !noImage ? {} : { image_url: image }) });
+      haptic.ok();
+      onSaved();
+    } catch {
+      toast('Не получилось, попробуйте ещё раз');
+      setBusy(false);
+    }
+  };
+
   return (
     <Sheet title="В вишлист" onClose={onClose}>
       <div className="chips" style={{ marginTop: 8 }}>
@@ -117,17 +156,32 @@ export function AddWishSheet({ initial = 'gift', title: t0 = '', onClose, onSave
           <button key={k} className={`chip ${kind === k ? 'on accent' : ''}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>
         ))}
       </div>
-      <label className="label">Что хочется</label>
-      <input className="input" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, шерстяной свитер" />
-      {kind === 'gift' && (
-        <>
-          <label className="label">Цена (необязательно)</label>
-          <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150 BYN" />
-          <label className="label">Ссылка (необязательно)</label>
-          <input className="input" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
-        </>
+
+      <label className="label">Ссылка (необязательно)</label>
+      <div className="field">
+        <input
+          value={url} inputMode="url" autoCapitalize="off" placeholder="Вставьте ссылку на товар"
+          onChange={(e) => setUrl(e.target.value)}
+          onPaste={(e) => { const t = e.clipboardData.getData('text'); if (/^https?:\/\//i.test(t.trim())) { setTimeout(() => fetchPreview(t), 0); } }}
+          onBlur={(e) => { if (!image && !noImage) fetchPreview(e.target.value); }}
+        />
+        <button className="send" disabled={!url.trim() || loading} onClick={() => fetchPreview(url)} aria-label="Загрузить превью">
+          {loading ? <span className="spinner" /> : <Link2 size={17} />}
+        </button>
+      </div>
+
+      {image && (
+        <div className="preview-card">
+          <img src={image} alt="" referrerPolicy="no-referrer" onError={() => setImage('')} />
+          <button className="icon-btn" onClick={() => { setImage(''); setNoImage(true); }} aria-label="Убрать картинку"><X size={15} /></button>
+        </div>
       )}
-      <button className="btn primary block" style={{ marginTop: 20 }} disabled={!title.trim()} onClick={async () => { await post('/wishes', { kind, title, price, url }); haptic.ok(); onSaved(); }}>Сохранить</button>
+
+      <label className="label">Что хочется</label>
+      <input className="input" autoFocus={!url} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, шерстяной свитер" />
+      <label className="label">Цена (необязательно)</label>
+      <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="150 BYN" />
+      <button className="btn primary block" style={{ marginTop: 20 }} disabled={!title.trim() || busy} onClick={save}>Сохранить</button>
     </Sheet>
   );
 }
