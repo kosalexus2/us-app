@@ -15,7 +15,7 @@ export type Today = {
   start_date: string | null;
   mood: { me: string | null; partner: string | null };
   question: { text: string; my_answer: string | null; partner_answered: boolean; partner_answer: string | null };
-  upcoming: { title: string; date: string; time: string | null; kind: string | null; in_days: number }[];
+  upcoming: { title: string; date: string; time: string | null; kind: string | null; in_days: number; id?: number | null; src?: 'event' | 'cal' | null }[];
   activity: { id: number; kind: string; text: string; created_at: number; name: string; user_id: number; photo_url: string | null; mine: boolean }[];
 };
 
