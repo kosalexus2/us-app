@@ -1,5 +1,5 @@
 import { db, now } from './db.js';
-import { notify } from './bot.js';
+import { hooks, notify } from './bot.js';
 
 // Помощник и правки: свободные слоты в календаре, отметка «сделано» голосом,
 // редактирование рецептов/желаний/событий/записок, порядок списков и расширенные напоминания.
@@ -215,6 +215,14 @@ export function registerAssist(api, { botToken, webAppUrl }) {
     if (req.body?.price !== undefined) f.price = clean(req.body.price, 60) || null;
     if (req.body?.url !== undefined) f.url = clean(req.body.url, 500) || null;
     if (req.body?.image_url !== undefined) f.image_url = clean(req.body.image_url, 600) || null;
+    // Ссылку добавили или заменили, а картинки нет: берём её со страницы. Если картинку убрали при той же ссылке, не трогаем.
+    const imageNow = f.image_url !== undefined ? f.image_url : w.image_url;
+    if (f.url && !imageNow && !w.image_url && hooks.linkPreview) {
+      try {
+        const p = await Promise.race([hooks.linkPreview(f.url), new Promise((r) => setTimeout(() => r(null), 8000))]);
+        if (p?.image) f.image_url = String(p.image).slice(0, 600);
+      } catch { /* ничего страшного */ }
+    }
     apply('wishes', req.params.id, f);
     return { ok: true };
   }));
