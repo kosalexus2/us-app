@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { db, now } from './db.js';
 import { questionForDay } from './questions.js';
-import { notify } from './bot.js';
+import { hooks, notify } from './bot.js';
 
 const TZ_OFFSET = Number(process.env.TZ_OFFSET_HOURS ?? 3); // Europe/Minsk
 const todayStr = () => new Date(Date.now() + TZ_OFFSET * 3600e3).toISOString().slice(0, 10);
@@ -332,10 +332,28 @@ export function registerRoutes(app, { botToken, webAppUrl, botUsername }) {
   });
   app.post('/api/wishes', guarded, async (req) => {
     const me = req.tgUser;
-    const title = need(clean(req.body?.title, 140));
+    let title = need(clean(req.body?.title, 140));
     const kind = ['gift', 'watch', 'dream'].includes(req.body?.kind) ? req.body.kind : 'gift';
+    let url = clean(req.body?.url, 500) || null;
+    // В быстрое «+» вставили просто ссылку: она становится ссылкой желания, название берём со страницы
+    let pre = null;
+    if (!url && /^https?:\/\/\S+$/i.test(title) && hooks.linkPreview) {
+      url = title.slice(0, 500);
+      try { pre = await Promise.race([hooks.linkPreview(url), new Promise((r) => setTimeout(() => r(null), 8000))]); } catch { /* ок */ }
+      title = clean(pre?.title, 140) || (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'Ссылка'; } })();
+    }
+    let price = clean(req.body?.price, 40) || null;
+    let image = clean(req.body?.image_url, 500) || null;
+    // Картинка не передана совсем (не '' и не null): берём её со страницы по ссылке. '' или null значит «не надо».
+    if (url && req.body?.image_url === undefined && hooks.linkPreview) {
+      try {
+        const p = pre || await Promise.race([hooks.linkPreview(url), new Promise((r) => setTimeout(() => r(null), 8000))]);
+        if (p?.image) image = String(p.image).slice(0, 500);
+        if (p?.price && !price) price = p.price;
+      } catch { /* без превью тоже сохраним */ }
+    }
     q('INSERT INTO wishes (couple_id, owner_id, kind, title, price, url, image_url, created_at) VALUES (?,?,?,?,?,?,?,?)')
-      .run(me.couple_id, me.id, kind, title, clean(req.body?.price, 40) || null, clean(req.body?.url, 500) || null, clean(req.body?.image_url, 500) || null, now());
+      .run(me.couple_id, me.id, kind, title, price, url, image, now());
     log(req, 'wish', kind === 'gift' ? 'добавил(а) что-то в вишлист' : `добавил(а) в вишлист «${title}»`, { push: kind !== 'gift' });
     return { ok: true };
   });
