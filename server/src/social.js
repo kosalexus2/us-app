@@ -468,7 +468,7 @@ export function registerSocial(api, { botToken, webAppUrl }) {
         seen.add(key);
         extra.push({
           title: c.owner_id === me.id ? c.title : `${first(partner)}: ${c.title}`,
-          date: c.date, time: c.time, kind: 'cal', in_days: dayDiff(today, c.date),
+          date: c.date, time: c.time, kind: 'cal', in_days: dayDiff(today, c.date), id: c.owner_id === me.id ? c.id : null, src: c.owner_id === me.id ? 'cal' : null,
         });
       }
       data.upcoming = [...data.upcoming, ...extra]
