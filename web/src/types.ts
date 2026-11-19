@@ -30,3 +30,4 @@ export type Recipe = { id: number; title: string; note: string | null; url?: str
 export type Wish = { id: number; kind: 'gift' | 'watch' | 'dream'; title: string; price: string | null; url: string | null; image_url: string | null; mine: boolean; claimed_by_me: boolean };
 export type Note = { id: number; mine: boolean; from_name: string; text: string | null; locked: boolean; open_at: number | null; created_at: number };
 export type EventT = { id: number; title: string; date: string; time: string | null; kind: string | null; yearly: number; remind_rule?: string | null };
+export type DiaryEntry = { id: number; mine: boolean; from_name: string | null; day: string; mood: string | null; body: string; shared: boolean; created_at: number };
