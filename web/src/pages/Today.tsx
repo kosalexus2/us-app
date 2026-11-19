@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CalendarHeart, Heart, Lock, Sparkles, UserPlus, Utensils, Cake, Plane, Calendar } from 'lucide-react';
-import { post, useResource } from '../api';
+import { patch, post, del, useResource } from '../api';
+import { EditSheet } from '../components/Editable';
 import { useApp } from '../ctx';
 import { Avatar, Sheet, Skeletons, useToast } from '../components/ui';
 import type { Today } from '../types';
@@ -12,6 +13,7 @@ export default function TodayPage() {
   const { data, reload } = useResource<Today>('/today', 4000);
   const [answer, setAnswer] = useState('');
   const [dateSheet, setDateSheet] = useState(false);
+  const [editEv, setEditEv] = useState<Today['upcoming'][number] | null>(null);
   const toast = useToast();
   const { me, partner } = boot;
 
@@ -111,7 +113,7 @@ export default function TodayPage() {
       {data.upcoming.length ? (
         <div className="scroller">
           {data.upcoming.map((e, i) => (
-            <div key={i} className="card ev">
+            <div key={i} className="card ev" role={e.src ? 'button' : undefined} style={e.src ? { cursor: 'pointer' } : undefined} onClick={() => e.src && e.id && setEditEv(e)}>
               <div className="top">
                 <span className={`round-ic ${e.kind === 'anniversary' ? '' : 'gray'}`}>
                   {e.kind === 'anniversary' ? <Cake size={18} /> : e.kind === 'trip' ? <Plane size={18} /> : <Utensils size={18} />}
@@ -147,6 +149,16 @@ export default function TodayPage() {
         <div className="card"><p className="sub" style={{ textAlign: 'center' }}><Heart size={14} style={{ verticalAlign: -2 }} /> Здесь будут появляться ваши общие действия</p></div>
       )}
 
+      {editEv && editEv.id && (
+        <EditSheet
+          title={editEv.src === 'cal' ? 'Встреча' : 'Событие'}
+          value={{ title: editEv.title, date: editEv.date, time: editEv.time || '' }}
+          fields={[{ k: 'title', label: 'Название' }, { k: 'date', label: 'Дата', type: 'date' }, { k: 'time', label: 'Время', type: 'time' }]}
+          onClose={() => setEditEv(null)}
+          onSave={async (p) => { await patch(`${editEv.src === 'cal' ? '/cal' : '/events'}/${editEv.id}`, p); reload(); }}
+          onDelete={async () => { await del(`${editEv.src === 'cal' ? '/cal' : '/events'}/${editEv.id}`); reload(); }}
+        />
+      )}
       {dateSheet && <DateSheet onClose={() => setDateSheet(false)} onSaved={() => { setDateSheet(false); reload(); reloadBoot(); }} />}
     </div>
   );
