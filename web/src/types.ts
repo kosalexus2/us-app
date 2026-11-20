@@ -31,3 +31,15 @@ export type Wish = { id: number; kind: 'gift' | 'watch' | 'dream'; title: string
 export type Note = { id: number; mine: boolean; from_name: string; text: string | null; locked: boolean; open_at: number | null; created_at: number };
 export type EventT = { id: number; title: string; date: string; time: string | null; kind: string | null; yearly: number; remind_rule?: string | null };
 export type DiaryEntry = { id: number; mine: boolean; from_name: string | null; day: string; mood: string | null; body: string; shared: boolean; created_at: number };
+
+export type Rsvp = 'yes' | 'maybe' | 'no';
+export type MeetingMember = { id: number; name: string; first_name: string; photo_url: string | null; rsvp: Rsvp | null };
+export type MeetingOption = { id: number; date: string; time: string | null; votes: Record<string, Rsvp>; score: number; yes: number; maybe: number; no: number };
+export type Meeting = {
+  id: number; title: string; date: string | null; time: string | null; place: string | null; note: string | null;
+  status: 'set' | 'poll'; owner_id: number; mine: boolean; my_rsvp: Rsvp | null;
+  members: MeetingMember[]; options: MeetingOption[]; counts: { yes: number; maybe: number; no: number };
+};
+export type CalItem = { src: 'cal' | 'chore' | 'event' | 'meeting'; id: number; title: string; date: string; time: string | null; done: boolean; rsvp?: Rsvp | null };
+export type CalMonth = { month: string; today: string; items: CalItem[] };
+export type FriendsStatus = { me: { status: string | null }; friends: { id: number; name: string; first_name: string; photo_url: string | null; status: string | null; online: boolean }[] };

@@ -169,6 +169,7 @@ async function handleCallback(token, webAppUrl, cb) {
   const [action, pendingId, target] = String(cb.data || '').split(':');
   const chatId = cb.message?.chat?.id;
   const answer = (text) => tg(token, 'answerCallbackQuery', { callback_query_id: cb.id, text });
+  if ((action === 'mr' || action === 'mv') && hooks.meetingCb) return hooks.meetingCb(token, webAppUrl, cb);
 
   if (action === 'drop') {
     q('DELETE FROM bot_pending WHERE id = ?').run(pendingId);

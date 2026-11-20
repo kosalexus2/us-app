@@ -58,6 +58,7 @@ await app.register(async (api) => {
   (await import('./social.js')).registerSocial(api, { botToken, webAppUrl });
   (await import('./assist.js')).registerAssist(api, { botToken, webAppUrl });
   (await import('./diary.js')).registerDiary(api, { botToken, webAppUrl });
+  (await import('./meetings.js')).registerMeetings(api, { botToken, webAppUrl });
 });
 
 app.setErrorHandler((err, req, reply) => {

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { BookHeart, CalendarDays, Heart, House, Plus } from 'lucide-react';
+import { CalendarDays, Heart, LayoutGrid, Plus, UserRound, Users } from 'lucide-react';
 import { useResource } from './api';
 import { Ctx, Tab } from './ctx';
 import { Avatar, Skeletons, ToastProvider } from './components/ui';
@@ -15,15 +15,20 @@ import TodayPage from './pages/Today';
 import Together, { EventSheet } from './pages/Together';
 import Home from './pages/Home';
 import Memory from './pages/Memory';
+import FriendsHome from './pages/FriendsHome';
+import Me from './pages/Me';
+import More from './pages/More';
+import { MeetingSheet, NewMeetingSheet } from './pages/Meetings';
 import type { Boot } from './types';
 import { haptic, startParam } from './tg';
 
 const TABS: [Tab, string, any][] = [
-  ['today', 'Сегодня', CalendarDays],
-  ['together', 'Вместе', Heart],
-  ['home', 'Дом', House],
-  ['memory', 'Память', BookHeart],
+  ['today', 'Отношения', Heart],
+  ['friends', 'Друзья', Users],
+  ['me', 'Личное', UserRound],
+  ['more', 'Ещё', LayoutGrid],
 ];
+void CalendarDays;
 
 export default function App() {
   return (
@@ -41,6 +46,7 @@ function Shell() {
   const [solo, setSolo] = useState(false);
   const [inviteDone, setInviteDone] = useState(false);
   const [person, setPerson] = useState<number | null>(null);
+  const [meeting, setMeeting] = useState<number | 'new' | null>(null);
 
   const go = useCallback((tab: Tab, sub?: string) => {
     haptic.tap();
@@ -56,7 +62,7 @@ function Shell() {
   }, []);
 
   const ctx = useMemo(
-    () => (boot ? { boot, go, reloadBoot: reload, openEventSheet: () => setEventSheet(true), openPerson } : null),
+    () => (boot ? { boot, go, reloadBoot: reload, openEventSheet: () => setEventSheet(true), openPerson, openMeeting: (id: number | 'new') => setMeeting(id) } : null),
     [boot, go, reload, openPerson],
   );
 
@@ -118,6 +124,9 @@ function Shell() {
         ) : (
         <main key={nav.tab}>
           {nav.tab === 'today' && <TodayPage />}
+          {nav.tab === 'friends' && <FriendsHome />}
+          {nav.tab === 'me' && <Me />}
+          {nav.tab === 'more' && <More />}
           {nav.tab === 'together' && <Together sub={nav.sub} />}
           {nav.tab === 'home' && <Home sub={nav.sub} />}
           {nav.tab === 'memory' && <Memory sub={nav.sub} />}
@@ -126,13 +135,13 @@ function Shell() {
 
         <nav className="nav" aria-label="Разделы">
           {TABS.slice(0, 2).map(([t, label, Icon]) => (
-            <button key={t} className={`tab ${nav.tab === t ? 'on' : ''}`} onClick={() => go(t)}>
+            <button key={t} className={`tab ${nav.tab === t || (t === 'more' && ['together', 'home', 'memory'].includes(nav.tab)) ? 'on' : ''}`} onClick={() => go(t)}>
               <Icon size={22} strokeWidth={nav.tab === t ? 2.4 : 1.8} /> {label}
             </button>
           ))}
           <button className="plus" onClick={() => { haptic.tap(); setQuick(true); }} aria-label="Добавить"><Plus size={28} strokeWidth={2.6} /></button>
           {TABS.slice(2).map(([t, label, Icon]) => (
-            <button key={t} className={`tab ${nav.tab === t ? 'on' : ''}`} onClick={() => go(t)}>
+            <button key={t} className={`tab ${nav.tab === t || (t === 'more' && ['together', 'home', 'memory'].includes(nav.tab)) ? 'on' : ''}`} onClick={() => go(t)}>
               <Icon size={22} strokeWidth={nav.tab === t ? 2.4 : 1.8} /> {label}
             </button>
           ))}
@@ -141,6 +150,8 @@ function Shell() {
         {person === null && <Assistant onDone={reload} />}
 
         {quick && <QuickAdd onClose={() => setQuick(false)} onDone={(t, s) => { setQuick(false); go(t, s); }} />}
+        {meeting === 'new' && <NewMeetingSheet onClose={() => setMeeting(null)} onSaved={() => setMeeting(null)} />}
+        {typeof meeting === 'number' && <MeetingSheet id={meeting} onClose={() => setMeeting(null)} onChanged={() => {}} />}
         {eventSheet && <EventSheet onClose={() => setEventSheet(false)} onSaved={() => setEventSheet(false)} />}
       </div>
     </Ctx.Provider>
