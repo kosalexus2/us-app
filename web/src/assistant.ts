@@ -3,7 +3,7 @@
 // «отметь что купил молоко» -> {kind:'done'}   «хотим суши на следующей неделе» -> {kind:'findtime'}
 // Важно: в JS \b и \w не работают с кириллицей, поэтому границы слов задаём явно.
 
-export type Kind = 'cal' | 'chore' | 'shopping' | 'wish' | 'place' | 'recipe' | 'note' | 'done' | 'findtime';
+export type Kind = 'task' | 'cal' | 'chore' | 'shopping' | 'wish' | 'place' | 'recipe' | 'note' | 'done' | 'findtime';
 
 export type Parsed = {
   kind: Kind;
@@ -17,6 +17,9 @@ export type Parsed = {
   together?: boolean; // «с Машей», «вдвоём», «нам»
   url?: string;
   instead?: boolean; // «вместо зала предложи кино»
+  place?: string; // «место спортзал»
+  project?: string; // «в проект Сайты»
+  urgent?: boolean; // «срочно»
   raw: string;
 };
 
@@ -240,6 +243,7 @@ const WANT_RE = re(`${L}(?:хочу|хотим|хотел[а]?(?:\\s+бы)?|да
 const TOGETHER_RE = re(`${L}(?:вдвоём|вдвоем|вместе|с\\s+(?:тобой|девушк[а-яё]+|женой|мужем|партнёром|партнером|парнем)|нам|мы)${R}`);
 
 const KIND_RULES: [RegExp, Kind][] = [
+  [word('задач[а-яё]*|таск[а-яё]*|дедлайн[а-яё]*'), 'task'],
   [word('подар[а-яё]*|вишлист[а-яё]*|мечт[а-яё]*|желани[а-яё]*'), 'wish'],
   [word('посмотреть|фильм[а-яё]*|сериал[а-яё]*'), 'wish'],
   [word('рецепт[а-яё]*|приготов[а-яё]*|готовить|испечь|сварить'), 'recipe'],
@@ -286,11 +290,12 @@ function trimEdges(t: string): string {
 }
 
 const DEFAULT_TITLE: Record<Kind, string> = {
-  cal: 'Встреча', wish: 'Желание', shopping: 'Покупка', chore: 'Дело',
+  task: 'Задача', cal: 'Встреча', wish: 'Желание', shopping: 'Покупка', chore: 'Дело',
   place: 'Место', recipe: 'Рецепт', note: 'Записка', done: 'Готово', findtime: 'Свободное время',
 };
 
 export const KIND_LABEL: Record<Kind, string> = {
+  task: 'Задача',
   cal: 'Встреча',
   chore: 'Дело',
   shopping: 'Покупки',
@@ -303,7 +308,7 @@ export const KIND_LABEL: Record<Kind, string> = {
 };
 
 /** Типы, между которыми можно переключиться руками в карточке помощника. */
-export const PICKABLE: Kind[] = ['cal', 'chore', 'shopping', 'wish', 'place', 'recipe', 'note'];
+export const PICKABLE: Kind[] = ['task', 'cal', 'chore', 'shopping', 'wish', 'place', 'recipe', 'note'];
 
 /** Главная функция: превращает фразу в понятное действие. */
 export function parseCommand(raw: string, today = new Date()): Parsed {
@@ -329,6 +334,16 @@ export function parseCommand(raw: string, today = new Date()): Parsed {
     s = (s.slice(0, mUrl.index) + ' ' + s.slice(mUrl.index + mUrl[0].length)).replace(/\s{2,}/g, ' ').trim();
   }
 
+  // «в проект Сайты», «место спортзал», «срочно» — только для задач
+  let project: string | undefined, place: string | undefined;
+  const END = `(?=$|[,.]|\\s+(?:на|в|до|к|за|срочно|напомни[а-яё]*|место|адрес|завтра|сегодня|послезавтра)(?:\\s|$))`;
+  const mProj = re(`${L}(?:в|по|для)\\s+проект[а-яё]*\\s+([${W}-]+)(?![${W}-])`).exec(s);
+  if (mProj) { project = mProj[1].trim(); s = (s.slice(0, mProj.index) + ' ' + s.slice(mProj.index + mProj[0].length)).replace(/\s{2,}/g, ' ').trim(); }
+  const mPlace = re(`${L}(?:место|адрес|локация)[:\\s]+([^,.]+?)${END}`).exec(s);
+  if (mPlace) { place = mPlace[1].trim(); s = (s.slice(0, mPlace.index) + ' ' + s.slice(mPlace.index + mPlace[0].length)).replace(/\s{2,}/g, ' ').trim(); }
+  const urgent = word('срочн[а-яё]*|дедлайн[а-яё]*').test(s);
+  if (urgent) s = s.replace(re(`${L}срочн[а-яё]*${R}`, 'gi'), ' ').replace(/\s{2,}/g, ' ').trim();
+
   const askedTime = FIND_RE.test(s);
   const together = TOGETHER_RE.test(s);
   const wants = WANT_RE.test(s);
@@ -351,13 +366,14 @@ export function parseCommand(raw: string, today = new Date()): Parsed {
   const calLike = !kind || kind === 'cal' || kind === 'recipe' || kind === 'place';
   const findtime = askedTime || (!!period && !date && !time && wants && calLike);
 
+  if ((project || urgent) && !findtime) kind = 'task';
   if (findtime) kind = 'findtime';
   else if (!kind && (date || time || remind !== undefined)) kind = 'cal';
   else if (!kind) kind = url ? 'wish' : 'shopping';
   // «приготовить суши в субботу» — это встреча, а не карточка рецепта
   if (kind === 'recipe' && (date || time)) kind = 'cal';
   // «надо записаться к врачу на следующей неделе» — дело со сроком
-  if (kind === 'chore' && period && !date) date = period.to;
+  if ((kind === 'chore' || kind === 'task') && period && !date) date = period.to;
 
   let title = s;
   for (const f of FILLERS) title = title.replace(f, ' ');
@@ -366,6 +382,7 @@ export function parseCommand(raw: string, today = new Date()): Parsed {
   title = title.charAt(0).toUpperCase() + title.slice(1);
 
   const out: Parsed = { kind, title, date, time, remind_min: remind, duration_min: duration, url, instead, raw: text };
+  if (kind === 'task') { out.place = place; out.project = project; out.urgent = urgent; }
   if (together) out.together = true;
   if (findtime) {
     const base = startOfDay(today);

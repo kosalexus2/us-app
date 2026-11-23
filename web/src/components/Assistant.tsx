@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { addTask, findProject, newTask, projectByName, useDoc } from '../store';
 import { createPortal } from 'react-dom';
 import { Bell, CalendarSearch, Check, Info, Mic, Send, Sparkles, UserPlus } from 'lucide-react';
 import { post } from '../api';
@@ -60,6 +61,7 @@ function AssistantSheet({ person, onParsed, onDone, onClose }: {
   const [invite, setInvite] = useState(false);
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [rec, setRec] = useState(false);
+  const { doc } = useDoc();
   const [busy, setBusy] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -82,6 +84,7 @@ function AssistantSheet({ person, onParsed, onDone, onClose }: {
     const p = parseCommand(value);
     setDraft(p);
     setChoreRule(p.kind === 'chore' && p.date ? 'morning' : null);
+    if (p.kind === 'task' && p.remind_min === undefined && p.date && doc.settings.remind != null) p.remind_min = doc.settings.remind;
     setInvite(!!p.together && !!mate);
   };
   const edit = (patch: Partial<Parsed>) => setDraft((d) => (d ? { ...d, ...patch } : d));
@@ -143,6 +146,15 @@ function AssistantSheet({ person, onParsed, onDone, onClose }: {
         case 'done': {
           const r = await post<{ type: string; title: string }>('/assist/complete', { text: draft.title });
           toast(`${r.type === 'shopping' ? 'Куплено' : 'Сделано'}: ${r.title}`);
+          break;
+        }
+        case 'task': {
+          addTask(newTask({
+            title: draft.title, due: draft.date, time: draft.time, place: draft.place,
+            kind: draft.urgent ? 'urgent' : 'list', project: projectByName(draft.project),
+            remind: draft.date ? draft.remind_min ?? null : null,
+          }));
+          toast(draft.date ? 'Задача добавлена в календарь' : 'Задача добавлена');
           break;
         }
         case 'cal': {
@@ -299,13 +311,13 @@ function AssistantSheet({ person, onParsed, onDone, onClose }: {
             </>
           )}
 
-          {(k === 'cal' || k === 'chore') && (
+          {(k === 'cal' || k === 'chore' || k === 'task') && (
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <label className="label">{k === 'chore' ? 'Срок' : 'Дата'}</label>
+                <label className="label">{k === 'chore' || k === 'task' ? 'Срок' : 'Дата'}</label>
                 <input className="input" type="date" value={draft.date || ''} onChange={(e) => edit({ date: e.target.value })} />
               </div>
-              {k === 'cal' && (
+              {(k === 'cal' || k === 'task') && (
                 <div style={{ width: 120 }}>
                   <label className="label">Время</label>
                   <input className="input" type="time" value={draft.time || ''} onChange={(e) => edit({ time: e.target.value })} />
@@ -314,7 +326,22 @@ function AssistantSheet({ person, onParsed, onDone, onClose }: {
             </div>
           )}
 
-          {k === 'cal' && (
+          {k === 'task' && (
+            <>
+              <label className="label">Проект</label>
+              <div className="chips">
+                {doc.projects.map((p) => (
+                  <button key={p.id} className={`chip ${(findProject(draft.project)?.id ?? doc.projects[0]?.id) === p.id ? 'on accent' : ''}`} onClick={() => edit({ project: p.name })}>{p.name}</button>
+                ))}
+                {draft.project && !findProject(draft.project) && <button className="chip on accent">+ {draft.project}</button>}
+              </div>
+              <label className="label">Место</label>
+              <input className="input" value={draft.place || ''} onChange={(e) => edit({ place: e.target.value || undefined })} placeholder="Необязательно" />
+              <div className="switch-row"><span>Срочная</span><Switch on={!!draft.urgent} onChange={(v) => edit({ urgent: v })} /></div>
+            </>
+          )}
+
+          {(k === 'cal' || k === 'task') && (
             <>
               <label className="label">Напомнить</label>
               <div className="chips">

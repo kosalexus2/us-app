@@ -9,6 +9,8 @@ import { fmtDate } from '../util';
 import type { CalItem, CalMonth } from '../types';
 import { RSVP_LABEL } from './Meetings';
 import { Habits } from '../components/Extras';
+import { TasksSection, TaskRow, TaskSheet } from './Tasks';
+import { Task, completeTask, newTask, postpone, useDoc } from '../store';
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -26,6 +28,8 @@ export default function Me() {
   const [month, setMonth] = useState(boot.today.slice(0, 7));
   const [sel, setSel] = useState(boot.today);
   const [sheet, setSheet] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const { doc } = useDoc();
   const [hidden, setHidden] = useState<string[]>([]);
   const [undo, setUndo] = useState<{ key: string; run: () => void } | null>(null);
   const timer = useRef<number>();
@@ -43,6 +47,11 @@ export default function Me() {
   for (const it of data?.items ?? []) (byDay[it.date] ||= []).push(it);
   const key = (it: CalItem) => `${it.src}${it.id}`;
   const list = (byDay[sel] ?? []).filter((it) => !hidden.includes(key(it)));
+  const todayStr = data?.today ?? boot.today;
+  const taskList = doc.tasks.filter((t) => t.due === sel).sort((a, b) => Number(a.done) - Number(b.done) || (a.time || '').localeCompare(b.time || ''));
+  const pmap = Object.fromEntries(doc.projects.map((p) => [p.id, p]));
+  const tFinish = (t: Task) => { haptic.ok(); const n = completeTask(t.id, todayStr); toast(t.done ? 'Вернул в работу' : n ? `Сделано, следующий раз ${fmtDate(n)}` : 'Готово'); };
+  const tTomorrow = (t: Task) => { haptic.tap(); postpone(t.id, addDay(t.due || todayStr, 1)); toast('Перенёс на завтра'); };
 
   const done = async (it: CalItem) => { haptic.ok(); await patch(`/chores/${it.id}`, { done: it.done ? 0 : 1 }); toast(it.done ? 'Вернул в дела' : 'Готово'); reload(); };
   const tomorrow = async (it: CalItem) => {
@@ -85,8 +94,6 @@ export default function Me() {
         <button className="tile" onClick={() => go('home', 'chores')}><CalendarCheck size={20} /> Дела</button>
       </div>
 
-      <Habits />
-
       <div className="card cal" onPointerDown={onTouchStart} onPointerUp={onTouchEnd}>
         <div className="cal-head">
           <button className="icon-btn" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Прошлый месяц"><ChevronLeft size={18} /></button>
@@ -98,11 +105,11 @@ export default function Me() {
           {cells.map((d, i) => {
             if (!d) return <span key={i} />;
             const k = iso(y, m, d);
-            const items = byDay[k] ?? [];
+            const items = [...(byDay[k] ?? []).map((i) => i.src as string), ...doc.tasks.filter((t) => t.due === k && !t.done).map(() => 'task')];
             return (
               <button key={i} className={`day ${k === sel ? 'sel' : ''} ${k === (data?.today ?? boot.today) ? 'today' : ''}`} onClick={() => { haptic.tap(); setSel(k); }}>
                 {d}
-                <i className="dots">{items.slice(0, 3).map((it, j) => <b key={j} className={it.src} />)}</i>
+                <i className="dots">{items.slice(0, 3).map((src, j) => <b key={j} className={src} />)}</i>
               </button>
             );
           })}
@@ -111,9 +118,9 @@ export default function Me() {
 
       <div className="sec-head">
         <h2>{fmtDate(sel)}</h2>
-        <button className="link" onClick={() => setSheet(true)}>+ Добавить</button>
+        <button className="link" onClick={() => setEditTask(newTask({ due: sel }))}>+ Добавить</button>
       </div>
-      {!data ? <Skeletons n={2} /> : list.length === 0 ? (
+      {!data ? <Skeletons n={2} /> : list.length === 0 && taskList.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', color: 'var(--label-2)' }}>На этот день ничего нет</div>
       ) : (
         <>
@@ -140,8 +147,21 @@ export default function Me() {
               );
             })}
           </div>
+          {taskList.length > 0 && (
+            <div className="stack" style={{ marginTop: 8 }}>
+              {taskList.map((t) => (
+                <SwipeRow key={t.id} right={{ label: 'Готово', tone: 'ok' }} left={{ label: 'На завтра', tone: 'accent' }} onRight={() => tFinish(t)} onLeft={() => tTomorrow(t)}>
+                  <TaskRow t={t} p={pmap[t.project]} today={todayStr} onTick={() => tFinish(t)} onOpen={() => setEditTask(t)} />
+                </SwipeRow>
+              ))}
+            </div>
+          )}
         </>
       )}
+
+      <TasksSection today={todayStr} onEvent={() => setSheet(true)} />
+
+      <Habits />
 
       {undo && (
         <div className="undo-bar">
@@ -149,16 +169,17 @@ export default function Me() {
           <button onClick={cancelUndo}>Отменить</button>
         </div>
       )}
-      <button className="fab-add" onClick={() => setSheet(true)} aria-label="Добавить"><Plus size={22} /></button>
-      {sheet && <NewItemSheet day={sel} onClose={() => setSheet(false)} onSaved={() => { setSheet(false); reload(); }} />}
+      <button className="fab-add" onClick={() => setEditTask(newTask({ due: sel }))} aria-label="Добавить"><Plus size={22} /></button>
+      {editTask && <TaskSheet task={editTask} isNew={!doc.tasks.some((x) => x.id === editTask.id)} onClose={() => setEditTask(null)} onEvent={() => { setEditTask(null); setSheet(true); }} />}
+      {sheet && <NewItemSheet day={sel} onClose={() => setSheet(false)} onSaved={() => { setSheet(false); reload(); }} onTask={() => { setSheet(false); setEditTask(newTask({ due: sel })); }} />}
     </div>
   );
 }
 
-function NewItemSheet({ day, onClose, onSaved }: { day: string; onClose: () => void; onSaved: () => void }) {
+function NewItemSheet({ day, onClose, onSaved, onTask }: { day: string; onClose: () => void; onSaved: () => void; onTask: () => void }) {
   const { boot } = useApp();
   const toast = useToast();
-  const [kind, setKind] = useState<'task' | 'event'>('task');
+  const [kind, setKind] = useState<'task' | 'event'>('event');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(day);
   const [time, setTime] = useState('');
@@ -185,7 +206,7 @@ function NewItemSheet({ day, onClose, onSaved }: { day: string; onClose: () => v
   return (
     <Sheet title="Добавить" onClose={onClose}>
       <div className="seg" style={{ marginTop: 10 }}>
-        <button className={kind === 'task' ? 'on' : ''} onClick={() => { setKind('task'); setRemind(''); }}>Задача</button>
+        <button className={kind === 'task' ? 'on' : ''} onClick={() => { onTask(); }}>Задача</button>
         <button className={kind === 'event' ? 'on' : ''} onClick={() => { setKind('event'); setRemind(''); }}>Событие</button>
       </div>
       <label className="label">Название</label>
