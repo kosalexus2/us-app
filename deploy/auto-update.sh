@@ -16,4 +16,5 @@ docker run -d --name us-app --restart unless-stopped --network "$NET" --memory 3
   --env-file "$APP/server/.env" -e HOST=0.0.0.0 -e PORT=3100 -e DB_PATH=/data/us-app.db \
   -v "$APP/data:/data" us-app >/dev/null
 docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -f --filter "until=48h" >/dev/null 2>&1 || true
 echo "$(date -Is) обновлено до $(git rev-parse --short HEAD)"

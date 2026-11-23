@@ -1,5 +1,6 @@
 import { BookHeart, Heart, House } from 'lucide-react';
 import { useApp } from '../ctx';
+import { Safety } from '../components/Extras';
 
 export default function More() {
   const { go } = useApp();
@@ -20,6 +21,7 @@ export default function More() {
           </button>
         ))}
       </div>
+      <Safety />
     </div>
   );
 }

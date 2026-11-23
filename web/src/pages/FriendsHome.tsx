@@ -8,6 +8,7 @@ import { fmtDate } from '../util';
 import { haptic } from '../tg';
 import type { FriendsStatus, Meeting, Rsvp } from '../types';
 import { RSVP_LABEL } from './Meetings';
+import { FriendsExtra } from '../components/Extras';
 
 export default function FriendsHome() {
   const { boot, openPerson, openMeeting } = useApp();
@@ -105,6 +106,7 @@ export default function FriendsHome() {
           </div>
         </>
       )}
+      <FriendsExtra onMeet={() => openMeeting('new')} />
     </div>
   );
 }

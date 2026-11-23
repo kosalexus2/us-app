@@ -8,6 +8,7 @@ import { haptic } from '../tg';
 import { fmtDate } from '../util';
 import type { CalItem, CalMonth } from '../types';
 import { RSVP_LABEL } from './Meetings';
+import { Habits } from '../components/Extras';
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -83,6 +84,8 @@ export default function Me() {
         <button className="tile" onClick={() => go('memory', 'wishlist')}><Gift size={20} /> Вишлист</button>
         <button className="tile" onClick={() => go('home', 'chores')}><CalendarCheck size={20} /> Дела</button>
       </div>
+
+      <Habits />
 
       <div className="card cal" onPointerDown={onTouchStart} onPointerUp={onTouchEnd}>
         <div className="cal-head">

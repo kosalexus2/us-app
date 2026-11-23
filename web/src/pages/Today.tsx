@@ -7,6 +7,7 @@ import { Avatar, Sheet, Skeletons, useToast } from '../components/ui';
 import type { Today } from '../types';
 import { ago, fmtDate, inDaysLabel, MOODS, MOOD_EMOJI, togetherSpan } from '../util';
 import { haptic, shareInvite } from '../tg';
+import { RelationshipPanel } from '../components/Extras';
 
 export default function TodayPage() {
   const { boot, go, reloadBoot } = useApp();
@@ -84,6 +85,8 @@ export default function TodayPage() {
           <p className="mood-note">{partner.first_name} сегодня: {MOOD_EMOJI[data.mood.partner] || ''}</p>
         )}
       </div>
+
+      <RelationshipPanel />
 
       <div className="card qcard" style={{ marginTop: 12 }}>
         <div className="tag"><Sparkles size={14} /> Вопрос дня</div>
